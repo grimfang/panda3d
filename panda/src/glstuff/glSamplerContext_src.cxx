@@ -27,7 +27,9 @@ CLP(SamplerContext)(CLP(GraphicsStateGuardian) *glgsg,
   SamplerContext(sampler)
 {
   _glgsg = glgsg;
+#ifndef OPENGLES
   _glgsg->_glGenSamplers(1, &_index);
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -38,7 +40,9 @@ CLP(SamplerContext)(CLP(GraphicsStateGuardian) *glgsg,
 CLP(SamplerContext)::
 ~CLP(SamplerContext)() {
   if (_index != 0) {
+#ifndef OPENGLES
     _glgsg->_glDeleteSamplers(1, &_index);
+#endif
     _index = 0;
   }
 }
@@ -74,7 +78,9 @@ evict_lru() {
 void CLP(SamplerContext)::
 reset_data() {
   // Free the sampler resource.
+#ifndef OPENGLES
   _glgsg->_glDeleteSamplers(1, &_index);
+#endif
   _index = 0;
 
   // We still need a valid index number, though, in case we want to

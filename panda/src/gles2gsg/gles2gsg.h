@@ -57,7 +57,7 @@
 //  #include <GLES2/gl2ext.h>
 #endif
 
-#include "panda_esgl2ext.h" 
+#include "panda_esgl2ext.h"
 
 // This helps to keep the source clean of hundreds of #ifdefs.
 typedef char GLchar;
@@ -100,12 +100,14 @@ typedef char GLchar;
 #define GL_RGBA16F GL_RGBA16F_EXT
 #define GL_RGB32F GL_RGB32F_EXT
 #define GL_RGBA32F GL_RGBA32F_EXT
+/* These are already defined in panda_esgl2ext.h
 #define GL_DEBUG_SEVERITY_HIGH GL_DEBUG_SEVERITY_HIGH_KHR
 #define GL_DEBUG_SEVERITY_MEDIUM GL_DEBUG_SEVERITY_MEDIUM_KHR
 #define GL_DEBUG_SEVERITY_LOW GL_DEBUG_SEVERITY_LOW_KHR
 #define GL_DEBUG_SEVERITY_NOTIFICATION GL_DEBUG_SEVERITY_NOTIFICATION_KHR
 #define GL_DEBUG_OUTPUT_SYNCHRONOUS GL_DEBUG_OUTPUT_SYNCHRONOUS_KHR
 #define GL_FRAMEBUFFER_SRGB GL_FRAMEBUFFER_SRGB_EXT
+*/
 #define GL_SRGB GL_SRGB_EXT
 #define GL_SRGB_ALPHA GL_SRGB_ALPHA_EXT
 #define GL_SRGB8 GL_SRGB8_EXT

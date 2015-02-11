@@ -821,10 +821,14 @@ CLP(ShaderContext)(CLP(GraphicsStateGuardian) *glgsg, Shader *s) : ShaderContext
                        param_type == GL_INT_VEC2 ||
                        param_type == GL_INT_VEC3 ||
                        param_type == GL_INT_VEC4 ||
-                       param_type == GL_UNSIGNED_INT ||
-                       param_type == GL_UNSIGNED_INT_VEC2 ||
+                       param_type == GL_UNSIGNED_INT
+#ifndef OPENGLES
+                       || param_type == GL_UNSIGNED_INT_VEC2 ||
                        param_type == GL_UNSIGNED_INT_VEC3 ||
                        param_type == GL_UNSIGNED_INT_VEC4);
+#else
+                       );
+#endif
 
       if (noprefix.empty()) {
         // Arbitrarily named attribute.
