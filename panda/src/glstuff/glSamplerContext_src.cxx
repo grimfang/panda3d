@@ -14,6 +14,8 @@
 
 #include "pnotify.h"
 
+#ifndef OPENGLES
+
 TypeHandle CLP(SamplerContext)::_type_handle;
 
 ////////////////////////////////////////////////////////////////////
@@ -87,3 +89,5 @@ reset_data() {
   // re-load the sampler later.
   //glGenSamplers(1, &_index);
 }
+
+#endif  // OPENGLES
