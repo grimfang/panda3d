@@ -81,3 +81,54 @@ your system.  Careful: it is not easy to uninstall Panda3D in this way!
 ```bash
 python2.7 makepanda/installpanda.py --prefix=/usr/local
 ```
+
+Android
+-----
+
+NOTE: The Android port is still in a very early development state use at your
+own risk!
+
+Building Panda3D on Android is easy.  All you need is to invoke the makepanda
+script using the version of Python that you want Panda3D to be built against.
+
+Before you can build Panda3D for android you need to get the Android-SDK and
+Android-NDK.
+Simply download the SDK from here: https://developer.android.com/sdk/index.html#Other
+and the NDK: https://developer.android.com/tools/sdk/ndk/index.html
+After that unpack them somewhere and follow the instructions in the README
+files
+
+After you successfully installed the Android-SDK and NDK you need to set the
+NDK_ROOT variable which will be used by the makepanda script.
+```bash
+export NDK_ROOT=[/path/to/ndk]
+```
+
+The following command illustrates how to build Panda3D for android:
+```bash
+python makepanda/makepanda.py --everything --target=android --arch=armv7a --no-python --no-pandatool --no-sse2 --no-neon --optimize 4
+```
+
+You will probably see some warnings saying that it's unable to find several
+dependency packages.  You should determine which ones you want to include in
+your build and install the respective development packages.  You may visit
+[this manual page](https://www.panda3d.org/manual/index.php/Dependencies)
+for an overview of the various dependencies.
+
+If you are on Ubuntu, this command should cover the most frequently
+used third-party packages:
+
+```bash
+sudo apt-get install python-dev libpng-dev zlib1g-dev libssl-dev libx11-dev libgl1-mesa-dev libxrandr-dev libxxf86dga-dev libxcursor-dev bison flex libfreetype6-dev libvorbis-dev libjpeg-dev libeigen3-dev libopenal-dev libode-dev libbullet-dev nvidia-cg-toolkit
+```
+
+Once Panda3D has built, you can call the following commands to build an apk
+and install it on your Android device
+
+```bash
+# Replace -t 1 with the desired target from "android list target"
+[/path/to/android-sdk/tools]android update project -t 1 -p built
+cd built
+ant debug
+ant installd
+```
