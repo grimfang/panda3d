@@ -12,6 +12,8 @@
 //
 ////////////////////////////////////////////////////////////////////
 
+#ifndef ANDROID
+
 #include "convert_srgb.h"
 
 #ifdef __GNUC__
@@ -163,3 +165,5 @@ has_sse2_sRGB_encode() {
 }
 
 #endif  // __SSE2__
+
+#endif  // ANDROID
