@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////
 
 #include "shaderGenerator.h"
+
 #include "renderState.h"
 #include "shaderAttrib.h"
 #include "auxBitplaneAttrib.h"
@@ -43,6 +44,8 @@
 #include "config_pgraphnodes.h"
 
 TypeHandle ShaderGenerator::_type_handle;
+
+#ifdef HAVE_CG
 
 ////////////////////////////////////////////////////////////////////
 //     Function: ShaderGenerator::Constructor
@@ -649,7 +652,7 @@ synthesize_shader(const RenderState *rs) {
 
   text << "//Cg\n";
 
-  text << "/* Generated shader for render state " << rs << ":\n";
+  text << "/* Generated shader for render state:\n";
   rs->write(text, 2);
   text << "*/\n";
 
@@ -1636,3 +1639,5 @@ texture_type_as_string(Texture::TextureType ttype) {
       return "2D";
   }
 }
+
+#endif  // HAVE_CG

@@ -1524,6 +1524,10 @@ write(ostream &out, int indent_level) const {
   case TT_cube_map:
     out << "cube map, " << cdata->_x_size << " x " << cdata->_y_size;
     break;
+
+  case TT_buffer_texture:
+    out << "buffer, " << cdata->_x_size;
+    break;
   }
 
   if (cdata->_num_views > 1) {
@@ -1893,7 +1897,8 @@ consider_rescale(PNMImage &pnmimage, const string &name, AutoTextureScale auto_t
     if (pnmimage.is_valid()) {
       // The image is already loaded.  Rescale on the spot.
       PNMImage new_image(new_x_size, new_y_size, pnmimage.get_num_channels(),
-                         pnmimage.get_maxval());
+                         pnmimage.get_maxval(), pnmimage.get_type(),
+                         pnmimage.get_color_space());
       new_image.quick_filter_from(pnmimage);
       pnmimage.take_from(new_image);
     } else {
@@ -1923,6 +1928,8 @@ format_texture_type(TextureType tt) {
     return "2d_texture_array";
   case TT_cube_map:
     return "cube_map";
+  case TT_buffer_texture:
+    return "buffer_texture";
   }
   return "**invalid**";
 }
@@ -1945,6 +1952,8 @@ string_texture_type(const string &str) {
     return TT_2d_texture_array;
   } else if (cmp_nocase(str, "cube_map") == 0) {
     return TT_cube_map;
+  } else if (cmp_nocase(str, "buffer_texture") == 0) {
+    return TT_buffer_texture;
   }
 
   gobj_cat->error()
@@ -2672,6 +2681,7 @@ do_read(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpath,
     switch (cdata->_texture_type) {
     case TT_1d_texture:
     case TT_2d_texture:
+    case TT_buffer_texture:
       z_size = 1;
       break;
 
@@ -2928,7 +2938,8 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
       pfm.clear(x_size, y_size, image.get_num_channels());
     } else {
       image = PNMImage(x_size, y_size, image.get_num_channels(),
-                       image.get_maxval(), image.get_type());
+                       image.get_maxval(), image.get_type(),
+                       image.get_color_space());
       image.fill(0.2, 0.3, 1.0);
       if (image.has_alpha()) {
         image.alpha_fill(1.0);
@@ -2988,7 +2999,8 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
       int x_size = image.get_x_size();
       int y_size = image.get_y_size();
       alpha_image = PNMImage(x_size, y_size, alpha_image.get_num_channels(),
-                             alpha_image.get_maxval(), alpha_image.get_type());
+                             alpha_image.get_maxval(), alpha_image.get_type(),
+                             alpha_image.get_color_space());
       alpha_image.fill(1.0);
       if (alpha_image.has_alpha()) {
         alpha_image.alpha_fill(1.0);
@@ -3047,7 +3059,8 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
 
       PNMImage scaled(image.get_x_size(), image.get_y_size(),
                       alpha_image.get_num_channels(),
-                      alpha_image.get_maxval(), alpha_image.get_type());
+                      alpha_image.get_maxval(), alpha_image.get_type(),
+                      alpha_image.get_color_space());
       scaled.quick_filter_from(alpha_image);
       Thread::consider_yield();
       alpha_image = scaled;
@@ -3063,7 +3076,6 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
   if (!alpha_fullpath.empty()) {
     // Make the original image a 4-component image by taking the
     // grayscale value from the second image.
-
     image.add_alpha();
 
     if (alpha_file_channel == 4 ||
@@ -3119,7 +3131,8 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
         pad_x_size = new_x_size - image.get_x_size();
         pad_y_size = new_y_size - image.get_y_size();
         PNMImage new_image(new_x_size, new_y_size, image.get_num_channels(),
-                           image.get_maxval());
+                           image.get_maxval(), image.get_type(),
+                           image.get_color_space());
         new_image.copy_sub_image(image, 0, new_y_size - image.get_y_size());
         image.take_from(new_image);
       }
@@ -3189,7 +3202,8 @@ do_load_one(CData *cdata, const PNMImage &pnmimage, const string &name, int z, i
       << y_size << "\n";
 
     PNMImage scaled(x_size, y_size, pnmimage.get_num_channels(),
-                    pnmimage.get_maxval(), pnmimage.get_type());
+                    pnmimage.get_maxval(), pnmimage.get_type(),
+                    pnmimage.get_color_space());
     scaled.quick_filter_from(pnmimage);
     Thread::consider_yield();
 
@@ -3580,7 +3594,6 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
         format = F_luminance;
       }
     }
-
   }
 
   do_setup_texture(cdata, texture_type, header.width, header.height, header.depth,
@@ -4856,7 +4869,8 @@ do_reconsider_image_properties(CData *cdata, int x_size, int y_size, int num_com
     }
 
 #ifndef NDEBUG
-    if (cdata->_texture_type == TT_1d_texture) {
+    if (cdata->_texture_type == TT_1d_texture ||
+        cdata->_texture_type == TT_buffer_texture) {
       nassertr(y_size == 1, false);
     } else if (cdata->_texture_type == TT_cube_map) {
       nassertr(x_size == y_size, false);
@@ -4912,7 +4926,8 @@ do_rescale_texture(CData *cdata) {
       << "Resizing " << get_name() << " to " << new_x_size << " x "
       << new_y_size << "\n";
     PNMImage new_image(new_x_size, new_y_size, orig_image.get_num_channels(),
-                       orig_image.get_maxval());
+                       orig_image.get_maxval(), orig_image.get_type(),
+                       orig_image.get_color_space());
     new_image.quick_filter_from(orig_image);
 
     do_clear_ram_image(cdata);
@@ -4943,7 +4958,8 @@ do_rescale_texture(CData *cdata) {
         return false;
       }
       PNMImage new_image(new_x_size, new_y_size, orig_image.get_num_channels(),
-                         orig_image.get_maxval());
+                         orig_image.get_maxval(), orig_image.get_type(),
+                         orig_image.get_color_space());
       new_image.copy_sub_image(orig_image, 0, new_y_size - orig_image.get_y_size());
 
       do_clear_ram_image(cdata);
@@ -5021,8 +5037,9 @@ do_clear(CData *cdata) {
 //  Description:
 ////////////////////////////////////////////////////////////////////
 void Texture::
-do_setup_texture(CData *cdata, Texture::TextureType texture_type, int x_size, int y_size,
-                 int z_size, Texture::ComponentType component_type,
+do_setup_texture(CData *cdata, Texture::TextureType texture_type,
+                 int x_size, int y_size, int z_size,
+                 Texture::ComponentType component_type,
                  Texture::Format format) {
   switch (texture_type) {
   case TT_1d_texture:
@@ -5049,6 +5066,10 @@ do_setup_texture(CData *cdata, Texture::TextureType texture_type, int x_size, in
     cdata->_default_sampler.set_wrap_u(SamplerState::WM_clamp);
     cdata->_default_sampler.set_wrap_v(SamplerState::WM_clamp);
     cdata->_default_sampler.set_wrap_w(SamplerState::WM_clamp);
+    break;
+
+  case TT_buffer_texture:
+    nassertv(y_size == 1 && z_size == 1);
     break;
   }
 
@@ -5198,7 +5219,8 @@ do_set_x_size(CData *cdata, int x_size) {
 void Texture::
 do_set_y_size(CData *cdata, int y_size) {
   if (cdata->_y_size != y_size) {
-    nassertv(cdata->_texture_type != Texture::TT_1d_texture || y_size == 1);
+    nassertv((cdata->_texture_type != Texture::TT_buffer_texture &&
+              cdata->_texture_type != Texture::TT_1d_texture) || y_size == 1);
     cdata->_y_size = y_size;
     cdata->inc_image_modified();
     do_clear_ram_image(cdata);
@@ -7896,6 +7918,10 @@ do_write_datagram_body(CData *cdata, BamWriter *manager, Datagram &me) {
   me.add_uint8(cdata->_format);
   me.add_uint8(cdata->_num_components);
 
+  if (cdata->_texture_type == TT_buffer_texture) {
+    me.add_uint8(cdata->_usage_hint);
+  }
+
   me.add_uint8(cdata->_auto_texture_scale);
   me.add_uint32(cdata->_orig_file_x_size);
   me.add_uint32(cdata->_orig_file_y_size);
@@ -8062,6 +8088,7 @@ make_this_from_bam(const FactoryParams &params) {
       options.set_auto_texture_scale(auto_texture_scale);
 
       switch (texture_type) {
+      case TT_buffer_texture:
       case TT_1d_texture:
       case TT_2d_texture:
         if (alpha_filename.empty()) {
@@ -8123,6 +8150,10 @@ do_fillin_body(CData *cdata, DatagramIterator &scan, BamReader *manager) {
   cdata->_format = (Format)scan.get_uint8();
   cdata->_num_components = scan.get_uint8();
 
+  if (cdata->_texture_type == TT_buffer_texture) {
+    cdata->_usage_hint = (GeomEnums::UsageHint)scan.get_uint8();
+  }
+
   cdata->inc_properties_modified();
 
   cdata->_auto_texture_scale = ATS_unspecified;
@@ -8145,9 +8176,7 @@ do_fillin_body(CData *cdata, DatagramIterator &scan, BamReader *manager) {
 
     size_t u_size = scan.get_uint32();
     PTA_uchar image = PTA_uchar::empty_array(u_size, get_class_type());
-    for (size_t u_idx = 0; u_idx < u_size; ++u_idx) {
-      image[(int)u_idx] = scan.get_uint8();
-    }
+    scan.extract_bytes(image.p(), u_size);
 
     cdata->_simple_ram_image._image = image;
     cdata->_simple_ram_image._page_size = u_size;
@@ -8200,13 +8229,11 @@ do_fillin_rawdata(CData *cdata, DatagramIterator &scan, BamReader *manager) {
       cdata->_ram_images[n]._page_size = scan.get_uint32();
     }
 
-    size_t u_size = scan.get_uint32();
-
     // fill the cdata->_image buffer with image data
+    size_t u_size = scan.get_uint32();
     PTA_uchar image = PTA_uchar::empty_array(u_size, get_class_type());
-    for (size_t u_idx = 0; u_idx < u_size; ++u_idx) {
-      image[(int)u_idx] = scan.get_uint8();
-    }
+    scan.extract_bytes(image.p(), u_size);
+
     cdata->_ram_images[n]._image = image;
   }
   cdata->_loaded_from_image = true;
@@ -8306,6 +8333,9 @@ CData() {
   // constructor), but set it to something else first to avoid the
   // check in do_set_format depending on an uninitialized value.
   _format = F_rgba;
+
+  // Only used for buffer textures.
+  _usage_hint = GeomEnums::UH_unspecified;
 
   _pad_x_size = 0;
   _pad_y_size = 0;

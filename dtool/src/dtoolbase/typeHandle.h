@@ -64,13 +64,6 @@
 
 class TypedObject;
 
-#ifdef HAVE_PYTHON
-#ifndef PyObject_HEAD
-struct _object;
-typedef _object PyObject;
-#endif
-#endif
-
 ////////////////////////////////////////////////////////////////////
 //       Class : TypeHandle
 // Description : TypeHandle is the identifier used to differentiate
@@ -104,9 +97,7 @@ PUBLISHED:
   INLINE TypeHandle();
   INLINE TypeHandle(const TypeHandle &copy);
 
-#ifdef HAVE_PYTHON
-  static PyObject *make(PyObject *classobj);
-#endif  // HAVE_PYTHON
+  EXTENSION(static TypeHandle make(PyTypeObject *classobj));
 
   INLINE bool operator == (const TypeHandle &other) const;
   INLINE bool operator != (const TypeHandle &other) const;
@@ -134,12 +125,12 @@ PUBLISHED:
 
 #ifdef DO_MEMORY_USAGE
   int get_memory_usage(MemoryClass memory_class) const;
-  void inc_memory_usage(MemoryClass memory_class, int size);
-  void dec_memory_usage(MemoryClass memory_class, int size);
+  void inc_memory_usage(MemoryClass memory_class, size_t size);
+  void dec_memory_usage(MemoryClass memory_class, size_t size);
 #else
   static CONSTEXPR int get_memory_usage(MemoryClass) { return 0; }
-  INLINE void inc_memory_usage(MemoryClass, int) { }
-  INLINE void dec_memory_usage(MemoryClass, int) { }
+  INLINE void inc_memory_usage(MemoryClass, size_t) { }
+  INLINE void dec_memory_usage(MemoryClass, size_t) { }
 #endif  // DO_MEMORY_USAGE
 
   INLINE int get_index() const;

@@ -35,9 +35,10 @@ template<class WType, int nbits>
 class BitMask {
 public:
   typedef WType WordType;
-  enum { num_bits = nbits };
 
 PUBLISHED:
+  enum { num_bits = nbits };
+
   INLINE BitMask();
   INLINE BitMask(WordType init_value);
   INLINE BitMask(const BitMask<WType, nbits> &copy);
@@ -51,10 +52,10 @@ PUBLISHED:
 
   INLINE ~BitMask();
 
-  INLINE static bool has_max_num_bits();
-  INLINE static int get_max_num_bits();
+  CONSTEXPR static bool has_max_num_bits();
+  CONSTEXPR static int get_max_num_bits();
 
-  INLINE static int get_num_bits();
+  CONSTEXPR static int get_num_bits();
   INLINE bool get_bit(int index) const;
   INLINE void set_bit(int index);
   INLINE void clear_bit(int index);
@@ -143,7 +144,7 @@ public:
   static TypeHandle get_class_type() {
     return _type_handle;
   }
-  static void init_type();
+  static void init_type(const string &name);
 
 private:
   static TypeHandle _type_handle;

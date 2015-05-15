@@ -143,8 +143,8 @@ class CompilationEnvironment:
                 self.arch = '-arch i386'
             elif proc == 'ppc':
                 self.arch = '-arch ppc'
-            elif proc == 'x86_64':
-                self.arch = '-arch x86_x64'
+            elif proc == 'amd64':
+                self.arch = '-arch x86_64'
             self.compileObj = "gcc -fPIC -c %(arch)s -o %(basename)s.o -O2 -I%(pythonIPath)s %(filename)s"
             self.linkExe = "gcc %(arch)s -o %(basename)s %(basename)s.o -framework Python"
             self.linkDll = "gcc %(arch)s -undefined dynamic_lookup -bundle -o %(basename)s.so %(basename)s.o"
@@ -1174,7 +1174,7 @@ class Freezer:
                 source = open(sourceFilename.toOsSpecific(), 'r').read()
                 if source and source[-1] != '\n':
                     source = source + '\n'
-                code = compile(source, sourceFilename.cStr(), 'exec')
+                code = compile(source, str(sourceFilename), 'exec')
 
         self.__addPyc(multifile, filename, code, compressionLevel)
 

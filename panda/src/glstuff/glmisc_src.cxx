@@ -14,6 +14,12 @@
 
 #include "pandaSystem.h"
 
+ConfigVariableBool gl_support_fbo
+  ("gl-support-fbo", true,
+   PRC_DESC("Configure this false if your GL's implementation of "
+            "EXT_framebuffer_object is broken.  The system might still be "
+            "able to create buffers using pbuffers or the like."));
+
 ConfigVariableBool gl_cheap_textures
   ("gl-cheap-textures", false,
    PRC_DESC("Configure this true to glHint the textures into the cheapest "
@@ -271,6 +277,15 @@ ConfigVariableBool gl_support_shadow_filter
             "implementation of ARB_shadow.  Particularly, older ATI "
             "cards suffered from a broken implementation of the "
             "shadow map filtering features."));
+
+ConfigVariableEnum<CoordinateSystem> gl_coordinate_system
+  ("gl-coordinate-system", CS_yup_right,
+   PRC_DESC("Which coordinate system to use as the internal "
+            "coordinate system for OpenGL operations.  If you are "
+            "using features like fixed-function sphere mapping, it is "
+            "best to leave this to yup-right.  However, if you are "
+            "creating a shader-only application, it may be easier and "
+            "more efficient to set this to default."));
 
 extern ConfigVariableBool gl_parallel_arrays;
 
