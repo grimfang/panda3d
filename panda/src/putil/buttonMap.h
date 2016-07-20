@@ -1,16 +1,15 @@
-// Filename: buttonMap.h
-// Created by:  rdb (07Mar14)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file buttonMap.h
+ * @author rdb
+ * @date 2014-03-07
+ */
 
 #ifndef BUTTONMAP_H
 #define BUTTONMAP_H
@@ -21,21 +20,19 @@
 #include "buttonRegistry.h"
 #include "pmap.h"
 
-////////////////////////////////////////////////////////////////////
-//       Class : ButtonMap
-// Description : This class represents a map containing all of the
-//               buttons of a (keyboard) device, though it can also
-//               be used as a generic mapping between ButtonHandles.
-//               It maps an underlying 'raw' button to a 'virtual'
-//               button, which may optionally be associated with an
-//               appropriate platform-specific name for the button.
-////////////////////////////////////////////////////////////////////
+/**
+ * This class represents a map containing all of the buttons of a (keyboard)
+ * device, though it can also be used as a generic mapping between
+ * ButtonHandles.  It maps an underlying 'raw' button to a 'virtual' button,
+ * which may optionally be associated with an appropriate platform-specific
+ * name for the button.
+ */
 class EXPCL_PANDA_PUTIL ButtonMap : public TypedReferenceCount {
 PUBLISHED:
-  INLINE int get_num_buttons() const;
-  INLINE ButtonHandle get_raw_button(int i) const;
-  INLINE ButtonHandle get_mapped_button(int i) const;
-  INLINE const string &get_mapped_button_label(int i) const;
+  INLINE size_t get_num_buttons() const;
+  INLINE ButtonHandle get_raw_button(size_t i) const;
+  INLINE ButtonHandle get_mapped_button(size_t i) const;
+  INLINE const string &get_mapped_button_label(size_t i) const;
 
   INLINE ButtonHandle get_mapped_button(ButtonHandle raw) const;
   INLINE ButtonHandle get_mapped_button(const string &raw_name) const;

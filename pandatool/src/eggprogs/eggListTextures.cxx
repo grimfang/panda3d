@@ -1,27 +1,23 @@
-// Filename: eggListTextures.cxx
-// Created by:  drose (23May05)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file eggListTextures.cxx
+ * @author drose
+ * @date 2005-05-23
+ */
 
 #include "eggListTextures.h"
 #include "eggTextureCollection.h"
 #include "pnmImageHeader.h"
-#include "pystub.h"
 
-////////////////////////////////////////////////////////////////////
-//     Function: EggListTextures::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 EggListTextures::
 EggListTextures() {
   set_program_brief("list textures referenced by an .egg file");
@@ -32,11 +28,9 @@ EggListTextures() {
      "format is crafted to be compatible with that file's input format.");
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: EggListTextures::run
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void EggListTextures::
 run() {
   if (!do_reader_options()) {
@@ -64,9 +58,6 @@ run() {
 
 
 int main(int argc, char *argv[]) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   EggListTextures prog;
   prog.parse_command_line(argc, argv);
   prog.run();

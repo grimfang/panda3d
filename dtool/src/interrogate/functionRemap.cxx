@@ -1,28 +1,30 @@
-// Filename: functionRemap.cxx
-// Created by:  drose (19Sep01)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file functionRemap.cxx
+ * @author drose
+ * @date 2001-09-19
+ */
 
 #include "functionRemap.h"
 #include "typeManager.h"
 #include "interrogate.h"
 #include "parameterRemap.h"
 #include "parameterRemapThis.h"
+#include "parameterRemapHandleToInt.h"
 #include "parameterRemapUnchanged.h"
 #include "interfaceMaker.h"
 #include "interrogateBuilder.h"
 
 #include "interrogateDatabase.h"
+#include "cppExpression.h"
 #include "cppInstance.h"
+#include "cppArrayType.h"
 #include "cppConstType.h"
 #include "cppFunctionType.h"
 #include "cppParameterList.h"
@@ -30,13 +32,9 @@
 #include "interrogateType.h"
 #include "pnotify.h"
 
-extern bool inside_python_native;
-
-////////////////////////////////////////////////////////////////////
-//     Function: FunctionRemap::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 FunctionRemap::
 FunctionRemap(const InterrogateType &itype, const InterrogateFunction &ifunc,
               CPPInstance *cppfunc, int num_default_parameters,
@@ -67,23 +65,18 @@ FunctionRemap(const InterrogateType &itype, const InterrogateFunction &ifunc,
   _is_valid = setup_properties(ifunc, interface_maker);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: FunctionRemap::Destructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 FunctionRemap::
 ~FunctionRemap() {
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: FunctionRemap::get_parameter_name
-//       Access: Public
-//  Description: Returns a string that will be a suitable name for the
-//               nth parameter in the generated code.  This may not
-//               correspond to the name of the parameter in the
-//               original code.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns a string that will be a suitable name for the nth parameter in the
+ * generated code.  This may not correspond to the name of the parameter in
+ * the original code.
+ */
 string FunctionRemap::
 get_parameter_name(int n) const {
   ostringstream str;
@@ -91,19 +84,31 @@ get_parameter_name(int n) const {
   return str.str();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: FunctionRemap::call_function
-//       Access: Public
-//  Description: Writes a sequence of commands to the given output
-//               stream to call the wrapped function.  The parameter
-//               values are taken from pexprs, if it is nonempty, or
-//               are assumed to be simply the names of the parameters,
-//               if it is empty.
-//
-//               The return value is the expression to return, if we
-//               are returning a value, or the empty string if we
-//               return nothing.
-////////////////////////////////////////////////////////////////////
+/**
+ * Writes a sequence of commands to the given output stream to call the
+ * wrapped function.  The parameter values are assumed to be simply the names
+ * of the parameters.
+ *
+ * The return value is the expression to return, if we are returning a value,
+ * or the empty string if we return nothing.
+ */
+string FunctionRemap::
+call_function(ostream &out, int indent_level, bool convert_result,
+              const string &container) const {
+  vector_string pexprs;
+  for (size_t i = 0; i < _parameters.size(); ++i) {
+    pexprs.push_back(get_parameter_name(i));
+  }
+  return call_function(out, indent_level, convert_result, container, pexprs);
+}
+
+/**
+ * Writes a sequence of commands to the given output stream to call the
+ * wrapped function.  The parameter values are taken from pexprs.
+ *
+ * The return value is the expression to return, if we are returning a value,
+ * or the empty string if we return nothing.
+ */
 string FunctionRemap::
 call_function(ostream &out, int indent_level, bool convert_result,
               const string &container, const vector_string &pexprs) const {
@@ -120,32 +125,29 @@ call_function(ostream &out, int indent_level, bool convert_result,
       InterfaceMaker::indent(out, indent_level)
         << "unref_delete(" << container << ");\n";
     } else {
-      if (inside_python_native) {
-        InterfaceMaker::indent(out, indent_level) << "Dtool_Py_Delete(self);\n";
-      } else {
-        InterfaceMaker::indent(out, indent_level) << "delete " << container << ";\n";
-      }
+      InterfaceMaker::indent(out, indent_level) << "delete " << container << ";\n";
     }
 
   } else if (_type == T_typecast_method) {
     // A typecast method can be invoked implicitly.
-    string cast_expr =
-      "(" + _return_type->get_orig_type()->get_local_name(&parser) +
-      ")(*" + container + ")";
+    ostringstream cast_expr;
+    cast_expr << "("
+      << _return_type->get_orig_type()->get_local_name(&parser) << ")";
+
+    _parameters[0]._remap->pass_parameter(cast_expr, container);
 
     if (!convert_result) {
-      return_expr = cast_expr;
+      return_expr = cast_expr.str();
     } else {
       string new_str =
-        _return_type->prepare_return_expr(out, indent_level, cast_expr);
+        _return_type->prepare_return_expr(out, indent_level, cast_expr.str());
       return_expr = _return_type->get_return_expr(new_str);
     }
 
   } else if (_type == T_typecast) {
-    // A regular typecast converts from a pointer type to another
-    // pointer type.  (This is different from the typecast method,
-    // above, which converts from the concrete type to some other
-    // type.)
+    // A regular typecast converts from a pointer type to another pointer
+    // type.  (This is different from the typecast method, above, which
+    // converts from the concrete type to some other type.)
     assert(!container.empty());
     string cast_expr =
       "(" + _return_type->get_orig_type()->get_local_name(&parser) +
@@ -161,10 +163,7 @@ call_function(ostream &out, int indent_level, bool convert_result,
 
   } else if (_type == T_constructor) {
     // A special case for constructors.
-    string defconstruct = builder.in_defconstruct(_cpptype->get_local_name(&parser));
-    if (pexprs.empty() && !defconstruct.empty()) {
-      return_expr = defconstruct;
-    } else if (_extension) {
+    if (_extension) {
       // Extension constructors are a special case.  We assume there is a
       // default constructor for the class, and the actual construction is
       // done by an __init__ method.
@@ -176,8 +175,22 @@ call_function(ostream &out, int indent_level, bool convert_result,
         << get_call_str("result", pexprs) << ";\n";
 
       return_expr = "result";
+
     } else {
-      return_expr = "new " + get_call_str(container, pexprs);
+      string defconstruct = builder.in_defconstruct(_cpptype->get_local_name(&parser));
+      string call_expr;
+
+      if (pexprs.empty() && !defconstruct.empty()) {
+        call_expr = defconstruct;
+      } else {
+        call_expr = get_call_str(container, pexprs);
+      }
+
+      if (!_return_type->return_value_needs_management()) {
+        return_expr = _return_type->get_return_expr(call_expr);
+      } else {
+        return_expr = "new " + call_expr;
+      }
     }
     if (_void_return) {
       nout << "Error, constructor for " << *_cpptype << " returning void.\n";
@@ -200,16 +213,16 @@ call_function(ostream &out, int indent_level, bool convert_result,
         _return_type->prepare_return_expr(out, indent_level, ref_expr);
       return_expr = _return_type->get_return_expr(new_str);
 
-      // Now a simple special-case test.  Often, we will have converted
-      // the reference-returning assignment operator to a pointer.  In
-      // this case, we might inadvertently generate code like "return
-      // &(*this)", when "return this" would do.  We check for this here
-      // and undo it as a special case.
+      // Now a simple special-case test.  Often, we will have converted the
+      // reference-returning assignment operator to a pointer.  In this case,
+      // we might inadvertently generate code like "return &(*this)", when
+      // "return this" would do.  We check for this here and undo it as a
+      // special case.
 
-      // There's no real good reason to do this, other than that it
-      // feels more satisfying to a casual perusal of the generated
-      // code.  It *is* conceivable that some broken compilers wouldn't
-      // like "&(*this)", though.
+      // There's no real good reason to do this, other than that it feels more
+      // satisfying to a casual perusal of the generated code.  It *is*
+      // conceivable that some broken compilers wouldn't like "&(*this)",
+      // though.
 
       if (return_expr == "&(" + ref_expr + ")" ||
           return_expr == "&" + ref_expr) {
@@ -225,24 +238,24 @@ call_function(ostream &out, int indent_level, bool convert_result,
     string call = get_call_str(container, pexprs);
 
     if (!convert_result) {
-      return_expr = get_call_str(container, pexprs);
+      return_expr = call;
 
     } else {
-      //if (_return_type->return_value_should_be_simple()) {
+      // if (_return_type->return_value_should_be_simple()) {
       if (false) {
-        // We have to assign the result to a temporary first; this makes
-        // it a bit easier on poor old VC++.
+        // We have to assign the result to a temporary first; this makes it a
+        // bit easier on poor old VC++.
         InterfaceMaker::indent(out, indent_level);
         _return_type->get_orig_type()->output_instance(out, "result",
                                                            &parser);
         out << " = " << call << ";\n";
 
-        // MOVE() expands to std::move() when we are compiling with a
-        // compiler that supports rvalue references.  It basically turns
-        // an lvalue into an rvalue, allowing a move constructor to be
-        // called instead of a copy constructor (since we won't be using
-        // the return value any more), which is usually more efficient if
-        // it exists.  If it doesn't, it shouldn't do any harm.
+        // MOVE() expands to std::move() when we are compiling with a compiler
+        // that supports rvalue references.  It basically turns an lvalue into
+        // an rvalue, allowing a move constructor to be called instead of a
+        // copy constructor (since we won't be using the return value any
+        // more), which is usually more efficient if it exists.  If it
+        // doesn't, it shouldn't do any harm.
         string new_str =
           _return_type->prepare_return_expr(out, indent_level, "MOVE(result)");
         return_expr = _return_type->get_return_expr(new_str);
@@ -259,13 +272,10 @@ call_function(ostream &out, int indent_level, bool convert_result,
   return return_expr;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: FunctionRemap::write_orig_prototype
-//       Access: Public
-//  Description: Writes a line describing the original C++ method or
-//               function.  This is generally useful only within a
-//               comment.
-////////////////////////////////////////////////////////////////////
+/**
+ * Writes a line describing the original C++ method or function.  This is
+ * generally useful only within a comment.
+ */
 void FunctionRemap::
 write_orig_prototype(ostream &out, int indent_level, bool local, int num_default_args) const {
   if (local) {
@@ -275,13 +285,10 @@ write_orig_prototype(ostream &out, int indent_level, bool local, int num_default
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: FunctionRemap::make_wrapper_entry
-//       Access: Public
-//  Description: Creates an InterrogateFunctionWrapper object
-//               corresponding to this callable instance and stores it
-//               in the database.
-////////////////////////////////////////////////////////////////////
+/**
+ * Creates an InterrogateFunctionWrapper object corresponding to this callable
+ * instance and stores it in the database.
+ */
 FunctionWrapperIndex FunctionRemap::
 make_wrapper_entry(FunctionIndex function_index) {
   _wrapper_index =
@@ -346,15 +353,13 @@ make_wrapper_entry(FunctionIndex function_index) {
       iwrapper._return_value_destructor = destructor;
 
     } else {
-      // We don't need to report this warning, since the FFI code
-      // understands that if the destructor function is zero, it
-      // should use the regular class destructor.
+      // We don't need to report this warning, since the FFI code understands
+      // that if the destructor function is zero, it should use the regular
+      // class destructor.
 
-      //          nout << "Warning!  Destructor for "
-      //               << *_return_type->get_orig_type()
-      //               << " is unavailable.\n"
-      //               << "  Cannot manage return value for:\n  "
-      //               << description << "\n";
+      // nout << "Warning!  Destructor for " << *_return_type->get_orig_type()
+      // << " is unavailable.\n" << "  Cannot manage return value for:\n  " <<
+      // description << "\n";
     }
   }
 
@@ -362,14 +367,11 @@ make_wrapper_entry(FunctionIndex function_index) {
   return _wrapper_index;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: FunctionRemap::get_call_str
-//       Access: Public
-//  Description: Returns a string suitable for calling the wrapped
-//               function.  If pexprs is nonempty, it represents
-//               the list of expressions that will evaluate to each
-//               parameter value.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns a string suitable for calling the wrapped function.  If pexprs is
+ * nonempty, it represents the list of expressions that will evaluate to each
+ * parameter value.
+ */
 string FunctionRemap::
 get_call_str(const string &container, const vector_string &pexprs) const {
   // Build up the call to the actual function.
@@ -377,28 +379,40 @@ get_call_str(const string &container, const vector_string &pexprs) const {
 
   // Getters and setters are a special case.
   if (_type == T_getter) {
-    if (!container.empty()) {
+    if (_has_this && !container.empty()) {
       call << "(" << container << ")->" << _expression;
     } else {
       call << _expression;
     }
 
   } else if (_type == T_setter) {
-    if (!container.empty()) {
-      call << "(" << container << ")->" << _expression;
+    string expr;
+    if (_has_this && !container.empty()) {
+      expr = "(" + container + ")->" + _expression;
     } else {
-      call << _expression;
+      expr = _expression;
     }
 
-    call << " = ";
+    // It's not possible to assign arrays in C++, we have to copy them.
+    CPPArrayType *array_type = _parameters[_first_true_parameter]._remap->get_orig_type()->as_array_type();
+    if (array_type != NULL) {
+      call << "std::copy(" << expr << ", " << expr << " + " << *array_type->_bounds << ", ";
+    } else {
+      call << expr << " = ";
+    }
+
     _parameters[_first_true_parameter]._remap->pass_parameter(call,
                     get_parameter_expr(_first_true_parameter, pexprs));
+
+    if (array_type != NULL) {
+      call << ')';
+    }
 
   } else {
     const char *separator = "";
 
-    // If this function is marked as having an extension function,
-    // call that instead.
+    // If this function is marked as having an extension function, call that
+    // instead.
     if (_extension) {
       if (!container.empty()) {
         call << "invoke_extension(" << container << ").";
@@ -418,14 +432,11 @@ get_call_str(const string &container, const vector_string &pexprs) const {
         call << _cpptype->get_local_name(&parser);
 
       } else if (_has_this && !container.empty()) {
-        // If we have a "this" parameter, the calling convention is also
-        // a bit different.
-        if (container == "local_this") {
-          // This isn't important, it just looks a bit prettier.
-          call << container << "->" << _cppfunc->get_local_name();
-        } else {
-          call << "(" << container << ")->" << _cppfunc->get_local_name();
-        }
+        // If we have a "this" parameter, the calling convention is also a bit
+        // different.
+        call << "(";
+        _parameters[0]._remap->pass_parameter(call, container);
+        call << ")." << _cppfunc->get_local_name();
 
       } else {
         call << _cppfunc->get_local_name(&parser);
@@ -439,8 +450,8 @@ get_call_str(const string &container, const vector_string &pexprs) const {
       separator = ", ";
     }
 
-    int pn = _first_true_parameter;
-    int num_parameters = pexprs.size();
+    size_t pn = _first_true_parameter;
+    size_t num_parameters = pexprs.size();
 
     if (_type == T_item_assignment_operator) {
       // The last parameter is the value to set.
@@ -465,29 +476,60 @@ get_call_str(const string &container, const vector_string &pexprs) const {
   return call.str();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: FunctionRemap::get_parameter_expr
-//       Access: Private
-//  Description: Returns a string that represents the expression
-//               associated with the nth parameter.  This is just the
-//               nth element of pexprs if it is nonempty, or the name
-//               of the nth parameter is it is empty.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the minimum number of arguments that needs to be passed to this
+ * function.
+ */
+int FunctionRemap::
+get_min_num_args() const {
+  int min_num_args = 0;
+  Parameters::const_iterator pi;
+  pi = _parameters.begin();
+  if (_has_this && pi != _parameters.end()) {
+    ++pi;
+  }
+  for (; pi != _parameters.end(); ++pi) {
+    ParameterRemap *param = (*pi)._remap;
+    if (param->get_default_value() != (CPPExpression *)NULL) {
+      // We've reached the first parameter that takes a default value.
+      break;
+    } else {
+      ++min_num_args;
+    }
+  }
+  return min_num_args;
+}
+
+/**
+ * Returns the maximum number of arguments that can be passed to this
+ * function.
+ */
+int FunctionRemap::
+get_max_num_args() const {
+  int max_num_args = _parameters.size();
+  if (_has_this && _type != FunctionRemap::T_constructor) {
+    --max_num_args;
+  }
+  return max_num_args;
+}
+
+/**
+ * Returns a string that represents the expression associated with the nth
+ * parameter.  This is just the nth element of pexprs if it is nonempty, or
+ * the name of the nth parameter is it is empty.
+ */
 string FunctionRemap::
-get_parameter_expr(int n, const vector_string &pexprs) const {
-  if (n < (int)pexprs.size()) {
+get_parameter_expr(size_t n, const vector_string &pexprs) const {
+  if (n < pexprs.size()) {
     return pexprs[n];
   }
   return get_parameter_name(n);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: FunctionRemap::setup_properties
-//       Access: Private
-//  Description: Sets up the properties of the function appropriately.
-//               Returns true if successful, or false if there is
-//               something unacceptable about the function.
-////////////////////////////////////////////////////////////////////
+/**
+ * Sets up the properties of the function appropriately.  Returns true if
+ * successful, or false if there is something unacceptable about the function.
+ */
 bool FunctionRemap::
 setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_maker) {
   _function_signature =
@@ -529,25 +571,31 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
       ((_cppfunc->_storage_class & CPPInstance::SC_static) == 0) &&
       _type != T_constructor) {
 
-    // If this is a method, but not a static method, and not a
-    // constructor, then we need a "this" parameter.
+    // If this is a method, but not a static method, and not a constructor,
+    // then we need a "this" parameter.
     _has_this = true;
     _const_method = (_ftype->_flags & CPPFunctionType::F_const_method) != 0;
 
     if (interface_maker->synthesize_this_parameter()) {
-      // If the interface_maker demands it, the "this" parameter is treated
-      // as any other parameter, and inserted at the beginning of the
-      // parameter list.
+      // If the interface_maker demands it, the "this" parameter is treated as
+      // any other parameter, and inserted at the beginning of the parameter
+      // list.
       Parameter param;
       param._name = "this";
       param._has_name = true;
-      param._remap = new ParameterRemapThis(_cpptype, _const_method);
+      if (_const_method) {
+        CPPType *const_type = CPPType::new_type(new CPPConstType(_cpptype));
+        param._remap = interface_maker->remap_parameter(_cpptype, const_type);
+      } else {
+        param._remap = interface_maker->remap_parameter(_cpptype, _cpptype);
+      }
+      // param._remap = new ParameterRemapThis(_cpptype, _const_method);
       _parameters.push_back(param);
       _first_true_parameter = 1;
     }
 
-    // Also check the name of the function.  If it's one of the
-    // assignment-style operators, flag it as such.
+    // Also check the name of the function.  If it's one of the assignment-
+    // style operators, flag it as such.
     if (fname == "operator =" ||
         fname == "operator *=" ||
         fname == "operator /=" ||
@@ -574,15 +622,15 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
   const CPPParameterList::Parameters &params =
     _ftype->_parameters->_parameters;
   for (int i = 0; i < (int)params.size() - _num_default_parameters; i++) {
-    //CPPType *type = params[i]->_type->resolve_type(&parser, _cppscope);
+    // CPPType *type = params[i]->_type->resolve_type(&parser, _cppscope);
     CPPType *type = params[i]->_type;
     Parameter param;
     param._has_name = true;
     param._name = params[i]->get_simple_name();
 
     if (param._name.empty()) {
-      // If the parameter has no name, record it as being nameless,
-      // but also synthesize one in case someone asks anyway.
+      // If the parameter has no name, record it as being nameless, but also
+      // synthesize one in case someone asks anyway.
       param._has_name = false;
       ostringstream param_name;
       param_name << "param" << i;
@@ -591,13 +639,14 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
 
     param._remap = interface_maker->remap_parameter(_cpptype, type);
     if (param._remap == (ParameterRemap *)NULL) {
-      // If we can't handle one of the parameter types, we can't call
-      // the function.
+      // If we can't handle one of the parameter types, we can't call the
+      // function.
       if (fname == "__traverse__") {
         // Hack to record this even though we can't wrap visitproc.
         param._remap = new ParameterRemapUnchanged(type);
       } else {
-        //nout << "Can't handle parameter " << i << " of method " << *_cppfunc << "\n";
+        // nout << "Can't handle parameter " << i << " of method " <<
+        // *_cppfunc << "\n";
         return false;
       }
     } else {
@@ -613,9 +662,9 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
   }
 
   if (_type == T_constructor) {
-    // Constructors are a special case.  These appear to return void
-    // as seen by the parser, but we know they actually return a new
-    // concrete instance.
+    // Constructors are a special case.  These appear to return void as seen
+    // by the parser, but we know they actually return a new concrete
+    // instance.
 
     if (_cpptype == (CPPType *)NULL) {
       nout << "Method " << *_cppfunc << " has no struct type\n";
@@ -628,9 +677,9 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
     }
 
   } else if (_type == T_assignment_method) {
-    // Assignment-type methods are also a special case.  We munge
-    // these to return *this, which is a semi-standard C++ convention
-    // anyway.  We just enforce it.
+    // Assignment-type methods are also a special case.  We munge these to
+    // return *this, which is a semi-standard C++ convention anyway.  We just
+    // enforce it.
 
     if (_cpptype == (CPPType *)NULL) {
       nout << "Method " << *_cppfunc << " has no struct type\n";
@@ -644,8 +693,8 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
     }
 
   } else if (_type == T_item_assignment_operator) {
-    // An item-assignment method isn't really a thing in C++, but it is
-    // in scripting languages, so we use this to denote item-access operators
+    // An item-assignment method isn't really a thing in C++, but it is in
+    // scripting languages, so we use this to denote item-access operators
     // that return a non-const reference.
 
     if (_cpptype == (CPPType *)NULL) {
@@ -684,8 +733,8 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
 
   if (_return_type == (ParameterRemap *)NULL ||
       !_return_type->is_valid()) {
-    // If our return type isn't something we can deal with, treat the
-    // function as if it returns NULL.
+    // If our return type isn't something we can deal with, treat the function
+    // as if it returns NULL.
     _void_return = true;
     _ForcedVoidReturn = true;
     CPPType *void_type = TypeManager::get_void_type();
@@ -711,9 +760,9 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
     _manage_reference_count = true;
     _return_value_needs_management = true;
 
-    // This is problematic, because we might not have the class in
-    // question fully defined here, particularly if the class is
-    // defined in some other library.
+    // This is problematic, because we might not have the class in question
+    // fully defined here, particularly if the class is defined in some other
+    // library.
     _return_value_destructor = builder.get_destructor_for(return_meat_type);
   }
 
@@ -726,10 +775,10 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
   if (_has_this || _type == T_constructor) {
     if (_parameters.size() > (size_t)first_param && _parameters[first_param]._name == "self" &&
         TypeManager::is_pointer_to_PyObject(_parameters[first_param]._remap->get_orig_type())) {
-      // Here's a special case.  If the first parameter of a nonstatic
-      // method is a PyObject * called "self", then we will
-      // automatically fill it in from the this pointer, and remove it
-      // from the generated parameter list.
+      // Here's a special case.  If the first parameter of a nonstatic method
+      // is a PyObject * called "self", then we will automatically fill it in
+      // from the this pointer, and remove it from the generated parameter
+      // list.
       _parameters.erase(_parameters.begin() + first_param);
       _flags |= F_explicit_self;
     }
@@ -834,8 +883,8 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
 
     } else {
       if (_args_type == InterfaceMaker::AT_varargs) {
-        // Every other method can take keyword arguments, if they
-        // take more than one argument.
+        // Every other method can take keyword arguments, if they take more
+        // than one argument.
         _args_type = InterfaceMaker::AT_keyword_args;
       }
     }
@@ -866,12 +915,11 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
     break;
 
   case T_constructor:
-    if (!_has_this && _parameters.size() == 1 &&
-        TypeManager::unwrap(_parameters[0]._remap->get_orig_type()) ==
-        TypeManager::unwrap(_return_type->get_orig_type())) {
-      // If this is the only parameter, and it's the same as the
-      // "this" type, this is a copy constructor.
+    if (_ftype->_flags & CPPFunctionType::F_copy_constructor) {
+      // It's a copy constructor.
       _flags |= F_copy_constructor;
+
+    } else if (_ftype->_flags & CPPFunctionType::F_move_constructor) {
 
     } else if (!_has_this && _parameters.size() > 0 &&
                (_cppfunc->_storage_class & CPPInstance::SC_explicit) == 0) {
@@ -890,9 +938,6 @@ setup_properties(const InterrogateFunction &ifunc, InterfaceMaker *interface_mak
   return true;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
 std::string make_safe_name(const std::string &name) {
   return InterrogateBuilder::clean_identifier(name);
   /*

@@ -2,8 +2,12 @@
 // by Package.pp, which puts it in the global namespace for all
 // ppremake scripts for Panda.
 
+// Actually, we don't have ppremake any more, but this file is still
+// being parsed today by makepanda.  We should probably find a better
+// place to put this.
+
 // Use spaces to separate the major, minor, and sequence numbers here.
-#define PANDA_VERSION 1 9 0
+#define PANDA_VERSION 1 10 0
 
 // This variable will be defined to false in the CVS repository, but
 // scripts that generate source tarballs and/or binary releases for

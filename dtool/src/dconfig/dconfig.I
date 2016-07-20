@@ -1,17 +1,15 @@
-// Filename: dconfig.I
-// Created by:  cary (20Mar00)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
-
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file dconfig.I
+ * @author cary
+ * @date 2000-03-20
+ */
 
 bool DConfig::
 GetBool(const string &sym, bool def) {
@@ -28,7 +26,7 @@ GetInt(const string &sym, int def) {
 float DConfig::
 GetFloat(const string &sym, float def) {
   ConfigVariableDouble var(sym, def, "DConfig", ConfigFlags::F_dconfig);
-  return var.get_value();
+  return (float)var.get_value();
 }
 
 double DConfig::

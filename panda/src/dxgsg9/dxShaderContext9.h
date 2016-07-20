@@ -1,16 +1,15 @@
-// Filename: dxShaderContext9.h
-// Created by: aignacio (Jan06)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file dxShaderContext9.h
+ * @author aignacio
+ * @date 2006-01
+ */
 
 #ifndef DXSHADERCONTEXT9_H
 #define DXSHADERCONTEXT9_H
@@ -22,14 +21,11 @@
 #include "shader.h"
 #include "shaderContext.h"
 
-#define CLP(name) DX##name##9
-#define CLASSPREFIX_QUOTED "DX"
-
 class VertexElementArray;
-class CLP(GraphicsStateGuardian);
+class DXGraphicsStateGuardian9;
 
-// Caution: adding HLSL support is going to be tricky, as the parsing needs
-// to be done in the cull thread, which cannot use the DX API.  - Josh
+// Caution: adding HLSL support is going to be tricky, as the parsing needs to
+// be done in the cull thread, which cannot use the DX API.  - Josh
 //
 //
 // typedef struct
@@ -56,16 +52,15 @@ class CLP(GraphicsStateGuardian);
 // }
 // DIRECT_3D_SHADER;
 
-////////////////////////////////////////////////////////////////////
-//       Class : DXShaderContext9
-// Description : xyz
-////////////////////////////////////////////////////////////////////
-class EXPCL_PANDADX CLP(ShaderContext) : public ShaderContext {
+/**
+ * xyz
+ */
+class EXPCL_PANDADX DXShaderContext9 : public ShaderContext {
 public:
-  typedef CLP(GraphicsStateGuardian) GSG;
+  typedef DXGraphicsStateGuardian9 GSG;
 
-  CLP(ShaderContext)(Shader *s, GSG *gsg);
-  ~CLP(ShaderContext)();
+  DXShaderContext9(Shader *s, GSG *gsg);
+  ~DXShaderContext9();
 
   INLINE bool valid(GSG *gsg);
   bool bind(GSG *gsg);
@@ -73,10 +68,10 @@ public:
   void issue_parameters(GSG *gsg, int altered);
   void issue_transform(GSG *gsg);
   void disable_shader_vertex_arrays(GSG *gsg);
-  bool update_shader_vertex_arrays(CLP(ShaderContext) *prev, GSG *gsg,
+  bool update_shader_vertex_arrays(DXShaderContext9 *prev, GSG *gsg,
                                    bool force);
   void disable_shader_texture_bindings(GSG *gsg);
-  void update_shader_texture_bindings(CLP(ShaderContext) *prev, GSG *gsg);
+  void update_shader_texture_bindings(DXShaderContext9 *prev, GSG *gsg);
 
   class VertexElementArray* _vertex_element_array;
   LPDIRECT3DVERTEXDECLARATION9 _vertex_declaration;
@@ -101,7 +96,7 @@ public:
   }
   static void init_type() {
     TypedObject::init_type();
-    register_type(_type_handle, CLASSPREFIX_QUOTED "ShaderContext",
+    register_type(_type_handle, "DXShaderContext9",
                   TypedObject::get_class_type());
   }
   virtual TypeHandle get_type() const {

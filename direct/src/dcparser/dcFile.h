@@ -1,16 +1,15 @@
-// Filename: dcFile.h
-// Created by:  drose (05Oct00)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file dcFile.h
+ * @author drose
+ * @date 2000-10-05
+ */
 
 #ifndef DCFILE_H
 #define DCFILE_H
@@ -26,12 +25,11 @@ class DCTypedef;
 class DCKeyword;
 class DCDeclaration;
 
-////////////////////////////////////////////////////////////////////
-//       Class : DCFile
-// Description : Represents the complete list of Distributed Class
-//               descriptions as read from a .dc file.
-////////////////////////////////////////////////////////////////////
-class EXPCL_DIRECT DCFile {
+/**
+ * Represents the complete list of Distributed Class descriptions as read from
+ * a .dc file.
+ */
+class DCFile {
 PUBLISHED:
   DCFile();
   ~DCFile();
@@ -129,5 +127,3 @@ private:
 #include "dcFile.I"
 
 #endif
-
-

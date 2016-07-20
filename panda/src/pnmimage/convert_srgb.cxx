@@ -1,23 +1,22 @@
-// Filename: convert_srgb.cxx
-// Created by:  rdb (13Nov14)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file convert_srgb.cxx
+ * @author rdb
+ * @date 2014-11-13
+ */
 
 #ifndef ANDROID
 
 #include "convert_srgb.h"
 
 // Lookup tables for converting from unsigned char formats.
-ALIGN_64BYTE const
+const
 unsigned char to_srgb8_table[256] = { 0x00, 0x0d, 0x16, 0x1c, 0x22, 0x26, 0x2a,
   0x2e, 0x32, 0x35, 0x38, 0x3b, 0x3d, 0x40, 0x42, 0x45, 0x47, 0x49, 0x4b, 0x4d,
   0x4f, 0x51, 0x53, 0x55, 0x56, 0x58, 0x5a, 0x5c, 0x5d, 0x5f, 0x60, 0x62, 0x63,
@@ -40,7 +39,7 @@ unsigned char to_srgb8_table[256] = { 0x00, 0x0d, 0x16, 0x1c, 0x22, 0x26, 0x2a,
   0xf9, 0xf9, 0xfa, 0xfa, 0xfb, 0xfb, 0xfb, 0xfc, 0xfc, 0xfd, 0xfd, 0xfe, 0xfe,
   0xff, 0xff};
 
-ALIGN_64BYTE const
+const
 unsigned char to_linear_uchar_table[256] = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
   0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x02,
   0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x04,
@@ -63,7 +62,6 @@ unsigned char to_linear_uchar_table[256] = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
   0xe0, 0xe2, 0xe5, 0xe7, 0xe9, 0xeb, 0xed, 0xef, 0xf2, 0xf4, 0xf6, 0xf8, 0xfa,
   0xfd, 0xff};
 
-ALIGN_64BYTE
 const float to_linear_float_table[256] = { 0, 0.000304f, 0.000607f, 0.000911f,
   0.001214f, 0.001518f, 0.001821f, 0.002125f, 0.002428f, 0.002732f, 0.003035f,
   0.003347f, 0.003677f, 0.004025f, 0.004391f, 0.004777f, 0.005182f, 0.005605f,
@@ -104,7 +102,8 @@ const float to_linear_float_table[256] = { 0, 0.000304f, 0.000607f, 0.000911f,
 
 
 #if defined(__SSE2__) || (_M_IX86_FP >= 2) || defined(_M_X64) || defined(_M_AMD64)
-// SSE2 support enabled at compile time.  No runtime detection mechanism needed.
+// SSE2 support enabled at compile time.  No runtime detection mechanism
+// needed.
 bool
 has_sse2_sRGB_encode() {
   return true;

@@ -1,16 +1,15 @@
-// Filename: textAssembler.h
-// Created by:  drose (06Apr04)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file textAssembler.h
+ * @author drose
+ * @date 2004-04-06
+ */
 
 #ifndef TEXTASSEMBLER_H
 #define TEXTASSEMBLER_H
@@ -34,15 +33,12 @@ class TextEncoder;
 class TextGraphic;
 class TextAssembler;
 
-////////////////////////////////////////////////////////////////////
-//       Class : TextAssembler
-// Description : This class is not normally used directly by user
-//               code, but is used by the TextNode to lay out a block
-//               of text and convert it into rows of Geoms according
-//               to the TextProperties.  However, user code may take
-//               advantage of it, if desired, for very low-level text
-//               operations.
-////////////////////////////////////////////////////////////////////
+/**
+ * This class is not normally used directly by user code, but is used by the
+ * TextNode to lay out a block of text and convert it into rows of Geoms
+ * according to the TextProperties.  However, user code may take advantage of
+ * it, if desired, for very low-level text operations.
+ */
 class EXPCL_PANDA_TEXT TextAssembler {
 PUBLISHED:
   TextAssembler(TextEncoder *encoder);
@@ -107,11 +103,18 @@ PUBLISHED:
   static bool has_character(wchar_t character, const TextProperties &properties);
   static bool is_whitespace(wchar_t character, const TextProperties &properties);
 
+PUBLISHED:
+  MAKE_PROPERTY(usage_hint, get_usage_hint, set_usage_hint);
+  MAKE_PROPERTY(max_rows, get_max_rows, set_max_rows);
+  MAKE_PROPERTY(dynamic_merge, get_dynamic_merge, set_dynamic_merge);
+  MAKE_PROPERTY(multiline_mode, get_multiline_mode, set_multiline_mode);
+  MAKE_PROPERTY(properties, get_properties, set_properties);
+
 private:
   class ComputedProperties : public ReferenceCount {
   public:
     INLINE ComputedProperties(const TextProperties &orig_properties);
-    INLINE ComputedProperties(ComputedProperties *based_on, 
+    INLINE ComputedProperties(ComputedProperties *based_on,
                               const wstring &wname, TextEncoder *encoder);
     void append_delta(wstring &wtext, ComputedProperties *other);
 
@@ -122,13 +125,13 @@ private:
   };
 
   // These structures are built up and operated on by scan_wtext() and
-  // wordwrap_text().  It represents the unrolling of the embedded \1
-  // .. \2 sequences embedded in the string into a TextProperties
-  // pointer associated with each character.
+  // wordwrap_text().  It represents the unrolling of the embedded \1 .. \2
+  // sequences embedded in the string into a TextProperties pointer associated
+  // with each character.
   class TextCharacter {
   public:
     INLINE TextCharacter(wchar_t character, ComputedProperties *cprops);
-    INLINE TextCharacter(const TextGraphic *graphic, 
+    INLINE TextCharacter(const TextGraphic *graphic,
                          const wstring &graphic_wname,
                          ComputedProperties *cprops);
     INLINE TextCharacter(const TextCharacter &copy);
@@ -164,28 +167,18 @@ private:
   // And here it is, wordwrapped.
   TextBlock _text_block;
 
-#ifndef CPPPARSER  // interrogate has a bit of trouble with wstring iterators.
   void scan_wtext(TextString &output_string,
-                  wstring::const_iterator &si, 
+                  wstring::const_iterator &si,
                   const wstring::const_iterator &send,
                   ComputedProperties *current_cprops);
-#endif  // CPPPARSER
 
   bool wordwrap_text();
 
   INLINE static PN_stdfloat calc_width(const TextCharacter &tch);
   static PN_stdfloat calc_hyphen_width(const TextCharacter &tch);
 
-  // These structures are built up by assemble_paragraph() and
-  // assemble_row().  They represent the actual Geoms as laid out in a
-  // paragraph.
-  
-  class Piece {
-  public:
-    PT(Geom) _geom;
-    CPT(RenderState) _state;
-  };
-  typedef pvector<Piece> Pieces;
+  // These structures are built up by assemble_paragraph() and assemble_row().
+  // They represent the actual Geoms as laid out in a paragraph.
 
   class GeomCollectorKey {
   public:
@@ -218,35 +211,59 @@ private:
   };
   typedef pmap<GeomCollectorKey, GeomCollector> GeomCollectorMap;
 
-  class GlyphPlacement : public MemoryBase {
+  struct QuadDef {
+    // Copying this class is a performance hotspot, hence we define the move
+    // constructor.
+    ALWAYS_INLINE QuadDef() {}
+    ALWAYS_INLINE QuadDef(const QuadDef &copy) :
+      _dimensions(copy._dimensions), _uvs(copy._uvs),
+      _slantl(copy._slantl), _slanth(copy._slanth),
+      _glyph(copy._glyph) {}
+
+#ifdef USE_MOVE_SEMANTICS
+    ALWAYS_INLINE QuadDef(QuadDef &&from) NOEXCEPT :
+      _dimensions(from._dimensions), _uvs(from._uvs),
+      _slantl(from._slantl), _slanth(from._slanth),
+      _glyph(move(from._glyph)) {}
+#endif
+
+    LVecBase4 _dimensions;
+    LVecBase4 _uvs;
+    PN_stdfloat _slantl, _slanth;
+    CPT(TextGlyph) _glyph;
+  };
+  typedef epvector<QuadDef> QuadDefs;
+  typedef pmap<CPT(RenderState), QuadDefs> QuadMap;
+
+  void generate_quads(GeomNode *geom_node, const QuadMap &quad_map);
+
+  class GlyphPlacement {
   public:
-    INLINE void add_piece(Geom *geom, const RenderState *state);
-    void calc_tight_bounds(LPoint3 &min_point, LPoint3 &max_point,
-                           bool &found_any, Thread *current_thread) const;
-    void assign_to(GeomNode *geom_node, const RenderState *state) const;
-    void assign_copy_to(GeomNode *geom_node, const RenderState *state, 
-                        const LMatrix4 &extra_xform) const;
+    void assign_to(GeomNode *geom_node, const RenderState *state,
+                   const LVector2 &offset = LVector2::zero()) const;
 
     void assign_append_to(GeomCollectorMap &geom_collector_map, const RenderState *state,
-                          const LMatrix4 &extra_xform) const;
-    void copy_graphic_to(PandaNode *node, const RenderState *state,
-                         const LMatrix4 &extra_xform) const;
+                          const LVector2 &offset = LVector2::zero()) const;
+    void assign_quad_to(QuadMap &quad_map, const RenderState *state,
+                        const LVector2 &offset = LVector2::zero()) const;
+    void copy_graphic_to(PandaNode *node, const RenderState *state) const;
 
-    Pieces _pieces;
+    CPT(TextGlyph) _glyph;
     PT(PandaNode) _graphic_model;
-    LMatrix4 _xform;
+    PN_stdfloat _xpos, _ypos;
+    PN_stdfloat _scale, _slant;
     const TextProperties *_properties;
   };
-  typedef pvector<GlyphPlacement *> PlacedGlyphs;
+  typedef pvector<GlyphPlacement> PlacedGlyphs;
 
   void assemble_paragraph(PlacedGlyphs &placed_glyphs);
   void assemble_row(TextRow &row,
                     PlacedGlyphs &row_placed_glyphs,
-                    PN_stdfloat &row_width, PN_stdfloat &line_height, 
+                    PN_stdfloat &row_width, PN_stdfloat &line_height,
                     TextProperties::Alignment &align, PN_stdfloat &wordwrap);
 
-  // These interfaces are for implementing cheesy accent marks and
-  // ligatures when the font doesn't support them.
+  // These interfaces are for implementing cheesy accent marks and ligatures
+  // when the font doesn't support them.
   enum CheesyPosition {
     CP_above,
     CP_below,
@@ -276,13 +293,13 @@ private:
 
   static void
   draw_underscore(TextAssembler::PlacedGlyphs &row_placed_glyphs,
-                  PN_stdfloat underscore_start, PN_stdfloat underscore_end, 
+                  PN_stdfloat underscore_start, PN_stdfloat underscore_end,
                   const TextProperties *underscore_properties);
 
   static void
   get_character_glyphs(int character, const TextProperties *properties,
-                       bool &got_glyph, const TextGlyph *&glyph,
-                       const TextGlyph *&second_glyph,
+                       bool &got_glyph, CPT(TextGlyph) &glyph,
+                       CPT(TextGlyph) &second_glyph,
                        UnicodeLatinMap::AccentType &accent_type,
                        int &additional_flags,
                        PN_stdfloat &glyph_scale, PN_stdfloat &advance_scale);
@@ -291,13 +308,13 @@ private:
   tack_on_accent(UnicodeLatinMap::AccentType accent_type,
                  const LPoint3 &min_vert, const LPoint3 &max_vert,
                  const LPoint3 &centroid,
-                 const TextProperties *properties, GlyphPlacement *placement) const;
-  bool 
-  tack_on_accent(char accent_mark, CheesyPosition position,
+                 const TextProperties *properties, GlyphPlacement &placement) const;
+  bool
+  tack_on_accent(wchar_t accent_mark, CheesyPosition position,
                  CheesyTransform transform,
                  const LPoint3 &min_vert, const LPoint3 &max_vert,
                  const LPoint3 &centroid,
-                 const TextProperties *properties, GlyphPlacement *placement) const;
+                 const TextProperties *properties, GlyphPlacement &placement) const;
 
   // These are filled in by assemble_paragraph().
   LVector2 _ul;
@@ -315,4 +332,3 @@ private:
 #include "textAssembler.I"
 
 #endif
-

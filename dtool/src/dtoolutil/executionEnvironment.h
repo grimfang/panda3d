@@ -1,16 +1,15 @@
-// Filename: executionEnvironment.h
-// Created by:  drose (15May00)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file executionEnvironment.h
+ * @author drose
+ * @date 2000-05-15
+ */
 
 #ifndef EXECUTIONENVIRONMENT_H
 #define EXECUTIONENVIRONMENT_H
@@ -22,14 +21,11 @@
 
 #include <map>
 
-////////////////////////////////////////////////////////////////////
-//       Class : ExecutionEnvironment
-// Description : Encapsulates access to the environment variables and
-//               command-line arguments at the time of execution.
-//               This is encapsulated to support accessing these
-//               things during static init time, which seems to be
-//               risky at best.
-////////////////////////////////////////////////////////////////////
+/**
+ * Encapsulates access to the environment variables and command-line arguments
+ * at the time of execution.  This is encapsulated to support accessing these
+ * things during static init time, which seems to be risky at best.
+ */
 class EXPCL_DTOOL ExecutionEnvironment {
 private:
   ExecutionEnvironment();
@@ -44,8 +40,8 @@ PUBLISHED:
 
   static string expand_string(const string &str);
 
-  INLINE static int get_num_args();
-  INLINE static string get_arg(int n);
+  INLINE static size_t get_num_args();
+  INLINE static string get_arg(size_t n);
 
   INLINE static string get_binary_name();
   INLINE static string get_dtool_name();
@@ -62,8 +58,8 @@ private:
   void ns_shadow_environment_variable(const string &var, const string &value);
   void ns_clear_shadow(const string &var);
 
-  int ns_get_num_args() const;
-  string ns_get_arg(int n) const;
+  size_t ns_get_num_args() const;
+  string ns_get_arg(size_t n) const;
 
   string ns_get_binary_name() const;
   string ns_get_dtool_name() const;

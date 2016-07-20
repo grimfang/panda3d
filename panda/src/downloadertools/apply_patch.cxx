@@ -1,19 +1,15 @@
-// Filename: apply_patch.cxx
-// Created by:  
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file apply_patch.cxx
+ */
 
 #include "pandabase.h"
-#include "pystub.h"
 #include "panda_getopt.h"
 #include "preprocess_argv.h"
 #include "patchfile.h"
@@ -21,9 +17,6 @@
 
 int
 main(int argc, char **argv) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   preprocess_argv(argc, argv);
 
   if (argc < 3) {

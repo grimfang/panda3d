@@ -1,16 +1,15 @@
-// Filename: p3dX11SplashWindow.h
-// Created by:  pro-rsoft (08Jul09)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file p3dX11SplashWindow.h
+ * @author rdb
+ * @date 2009-07-08
+ */
 
 #ifndef P3DX11SPLASHWINDOW_H
 #define P3DX11SPLASHWINDOW_H
@@ -25,11 +24,9 @@
 
 #include <vector>
 
-////////////////////////////////////////////////////////////////////
-//       Class : P3DX11SplashWindow
-// Description : This is the Windows implementation of the
-//               initial-download window.
-////////////////////////////////////////////////////////////////////
+/**
+ * This is the Windows implementation of the initial-download window.
+ */
 class P3DX11SplashWindow : public P3DSplashWindow {
 public:
   P3DX11SplashWindow(P3DInstance *inst, bool make_visible);
@@ -86,7 +83,7 @@ private:
   void setup_gc();
   void close_window();
 
-  void update_image(X11ImageData &image); 
+  void update_image(X11ImageData &image);
   void compose_image();
   bool scale_image(vector<unsigned char> &image0, int &image0_width, int &image0_height,
                    X11ImageData &image);
@@ -123,17 +120,20 @@ private:
   double _install_progress;
   bool _progress_known;
   size_t _received_data;
-  
+
   string _label_text;
 
   X11_Display *_display;
   int _screen;
+  XFontStruct *_font;
   GC _graphics_context;
   GC _bar_context;
+  GC _bar_bg_context;
   unsigned long _fg_pixel;
   unsigned long _bg_pixel;
   unsigned long _bar_pixel;
-  
+  unsigned long _bar_bg_pixel;
+
   X11_Window _window;
 };
 

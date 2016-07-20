@@ -1,32 +1,28 @@
-// Filename: vrmlTrans.cxx
-// Created by:  drose (01Oct04)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file vrmlTrans.cxx
+ * @author drose
+ * @date 2004-10-01
+ */
 
 #include "vrmlTrans.h"
 #include "parse_vrml.h"
-#include "pystub.h"
 
-////////////////////////////////////////////////////////////////////
-//     Function: VRMLTrans::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 VRMLTrans::
 VRMLTrans() :
   WithOutputFile(true, true, false)
 {
-  // Indicate the extension name we expect the user to supply for
-  // output files.
+  // Indicate the extension name we expect the user to supply for output
+  // files.
   _preferred_extension = ".wrl";
 
   set_program_brief("reads and writes VRML 2.0 files");
@@ -49,11 +45,9 @@ VRMLTrans() :
 }
 
 
-////////////////////////////////////////////////////////////////////
-//     Function: VRMLTrans::run
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void VRMLTrans::
 run() {
   nout << "Reading " << _input_filename << "\n";
@@ -68,11 +62,9 @@ run() {
 }
 
 
-////////////////////////////////////////////////////////////////////
-//     Function: VRMLTrans::handle_args
-//       Access: Protected, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool VRMLTrans::
 handle_args(ProgramBase::Args &args) {
   if (!check_last_arg(args, 1)) {
@@ -95,9 +87,6 @@ handle_args(ProgramBase::Args &args) {
 
 
 int main(int argc, char *argv[]) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   VRMLTrans prog;
   prog.parse_command_line(argc, argv);
   prog.run();

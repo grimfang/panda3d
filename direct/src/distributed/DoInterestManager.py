@@ -7,11 +7,12 @@ zone, remove interest in that zone.
 p.s. A great deal of this code is just code moved from ClientRepository.py.
 """
 
-from pandac.PandaModules import *
-from MsgTypes import *
+from panda3d.core import *
+from panda3d.direct import *
+from .MsgTypes import *
 from direct.showbase.PythonUtil import *
 from direct.showbase import DirectObject
-from PyDatagram import PyDatagram
+from .PyDatagram import PyDatagram
 from direct.directnotify.DirectNotifyGlobal import directNotify
 import types
 from direct.showbase.PythonUtil import report
@@ -78,12 +79,7 @@ class DoInterestManager(DirectObject.DirectObject):
     Top level Interest Manager
     """
     notify = directNotify.newCategory("DoInterestManager")
-    try:
-        tempbase = base
-    except:
-        tempbase = simbase
-    InterestDebug = tempbase.config.GetBool('interest-debug', False)
-    del tempbase
+    InterestDebug = ConfigVariableBool('interest-debug', False)
 
     # 'handle' is a number that represents a single interest set that the
     # client has requested; the interest set may be modified
@@ -178,19 +174,19 @@ class DoInterestManager(DirectObject.DirectObject):
                         'addInterest: no setParentingRules defined in the DC for object %s (%s)'
                         '' % (parentId, parent.__class__.__name__))
 
-                    
-        
+
+
         if event:
             contextId = self._getNextContextId()
         else:
             contextId = 0
             # event = self._getAnonymousEvent('addInterest')
-            
+
         DoInterestManager._interests[handle] = InterestState(
             description, InterestState.StateActive, contextId, event, parentId, zoneIdList, self._completeEventCount)
         if self.__verbose():
-            print 'CR::INTEREST.addInterest(handle=%s, parentId=%s, zoneIdList=%s, description=%s, event=%s)' % (
-                handle, parentId, zoneIdList, description, event)
+            print('CR::INTEREST.addInterest(handle=%s, parentId=%s, zoneIdList=%s, description=%s, event=%s)' % (
+                handle, parentId, zoneIdList, description, event))
         self._sendAddInterest(handle, contextId, parentId, zoneIdList, description)
         if event:
             messenger.send(self._getAddInterestEvent(), [event])
@@ -223,8 +219,8 @@ class DoInterestManager(DirectObject.DirectObject):
         DoInterestManager._interests[handle] = InterestState(
             description, InterestState.StateActive, 0, None, parentId, zoneIdList, self._completeEventCount, True)
         if self.__verbose():
-            print 'CR::INTEREST.addInterest(handle=%s, parentId=%s, zoneIdList=%s, description=%s)' % (
-                handle, parentId, zoneIdList, description)
+            print('CR::INTEREST.addInterest(handle=%s, parentId=%s, zoneIdList=%s, description=%s)' % (
+                handle, parentId, zoneIdList, description))
         assert self.printInterestsIfDebug()
         return InterestHandle(handle)
 
@@ -271,14 +267,14 @@ class DoInterestManager(DirectObject.DirectObject):
                 if not event:
                     self._considerRemoveInterest(handle)
                 if self.__verbose():
-                    print 'CR::INTEREST.removeInterest(handle=%s, event=%s)' % (
-                        handle, event)
+                    print('CR::INTEREST.removeInterest(handle=%s, event=%s)' % (
+                        handle, event))
         else:
             DoInterestManager.notify.warning(
                 "removeInterest: handle not found: %s" % (handle))
         assert self.printInterestsIfDebug()
         return existed
-    
+
     def removeAutoInterest(self, handle):
         """
         Stop looking in a (set of) zone(s)
@@ -307,7 +303,7 @@ class DoInterestManager(DirectObject.DirectObject):
                 intState.state = InterestState.StatePendingDel
                 self._considerRemoveInterest(handle)
                 if self.__verbose():
-                    print 'CR::INTEREST.removeAutoInterest(handle=%s)' % (handle)
+                    print('CR::INTEREST.removeAutoInterest(handle=%s)' % (handle))
         else:
             DoInterestManager.notify.warning(
                 "removeInterest: handle not found: %s" % (handle))
@@ -357,13 +353,13 @@ class DoInterestManager(DirectObject.DirectObject):
 
             contextId = self._getNextContextId()
             DoInterestManager._interests[handle].context = contextId
-            DoInterestManager._interests[handle].parentId = parentId            
+            DoInterestManager._interests[handle].parentId = parentId
             DoInterestManager._interests[handle].zoneIdList = zoneIdList
             DoInterestManager._interests[handle].addEvent(event)
 
             if self.__verbose():
-                print 'CR::INTEREST.alterInterest(handle=%s, parentId=%s, zoneIdList=%s, description=%s, event=%s)' % (
-                    handle, parentId, zoneIdList, description, event)
+                print('CR::INTEREST.alterInterest(handle=%s, parentId=%s, zoneIdList=%s, description=%s, event=%s)' % (
+                    handle, parentId, zoneIdList, description, event))
             self._sendAddInterest(handle, contextId, parentId, zoneIdList, description, action='modify')
             exists = True
             assert self.printInterestsIfDebug()
@@ -426,7 +422,7 @@ class DoInterestManager(DirectObject.DirectObject):
         Consider whether we should cull the interest set.
         """
         assert DoInterestManager.notify.debugCall()
-        
+
         if handle in DoInterestManager._interests:
             if DoInterestManager._interests[handle].isPendingDelete():
                 # make sure there is no pending event for this interest
@@ -450,24 +446,24 @@ class DoInterestManager(DirectObject.DirectObject):
                 DoInterestManager._debug_maxDescriptionLen, len(description))
 
         def printInterestHistory(self):
-            print "***************** Interest History *************"
+            print("***************** Interest History *************")
             format = '%9s %' + str(DoInterestManager._debug_maxDescriptionLen) + 's %6s %6s %9s %s'
-            print format % (
+            print(format % (
                 "Action", "Description", "Handle", "Context", "ParentId",
-                "ZoneIdList")
+                "ZoneIdList"))
             for i in DoInterestManager._debug_interestHistory:
-                print format % tuple(i)
-            print "Note: interests with a Context of 0 do not get" \
-                " done/finished notices."
-            
+                print(format % tuple(i))
+            print("Note: interests with a Context of 0 do not get" \
+                " done/finished notices.")
+
         def printInterestSets(self):
-            print "******************* Interest Sets **************"
+            print("******************* Interest Sets **************")
             format = '%6s %' + str(DoInterestManager._debug_maxDescriptionLen) + 's %11s %11s %8s %8s %8s'
-            print format % (
-                "Handle", "Description", 
+            print(format % (
+                "Handle", "Description",
                 "ParentId", "ZoneIdList",
                 "State", "Context",
-                "Event")
+                "Event"))
             for id, state in DoInterestManager._interests.items():
                 if len(state.events) == 0:
                     event = ''
@@ -475,16 +471,16 @@ class DoInterestManager(DirectObject.DirectObject):
                     event = state.events[0]
                 else:
                     event = state.events
-                print format % (id, state.desc,
+                print(format % (id, state.desc,
                                 state.parentId, state.zoneIdList,
                                 state.state, state.context,
-                                event)
-            print "************************************************"
+                                event))
+            print("************************************************")
 
         def printInterests(self):
             self.printInterestHistory()
             self.printInterestSets()
-            
+
     def _sendAddInterest(self, handle, contextId, parentId, zoneIdList, description,
                          action=None):
         """
@@ -497,7 +493,7 @@ class DoInterestManager(DirectObject.DirectObject):
         """
         assert DoInterestManager.notify.debugCall()
         if __debug__:
-            if isinstance(zoneIdList, types.ListType):
+            if isinstance(zoneIdList, list):
                 zoneIdList.sort()
             if action is None:
                 action = 'add'
@@ -512,7 +508,7 @@ class DoInterestManager(DirectObject.DirectObject):
         datagram.addUint16(handle)
         datagram.addUint32(contextId)
         datagram.addUint32(parentId)
-        if isinstance(zoneIdList, types.ListType):
+        if isinstance(zoneIdList, list):
             vzl = list(zoneIdList)
             vzl.sort()
             uniqueElements(vzl)
@@ -590,7 +586,7 @@ class DoInterestManager(DirectObject.DirectObject):
         handle = di.getUint16()
         contextId = di.getUint32()
         if self.__verbose():
-            print 'CR::INTEREST.interestDone(handle=%s)' % handle
+            print('CR::INTEREST.interestDone(handle=%s)' % handle)
         DoInterestManager.notify.debug(
             "handleInterestDoneMessage--> Received handle %s, context %s" % (
             handle, contextId))

@@ -1,16 +1,15 @@
-// Filename: p3dSplashWindow.h
-// Created by:  drose (17Jun09)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file p3dSplashWindow.h
+ * @author drose
+ * @date 2009-06-17
+ */
 
 #ifndef P3DSPLASHWINDOW_H
 #define P3DSPLASHWINDOW_H
@@ -21,16 +20,14 @@
 
 class P3DInstance;
 
-////////////////////////////////////////////////////////////////////
-//       Class : P3DSplashWindow
-// Description : This window is displayed temporarily, in place of an
-//               instance's actual window, during the initial launch
-//               of an applet, and also during the initial download of
-//               Panda3D code if necessary.
-//
-//               This is the base implementation; it contains no
-//               specific code to open a window.
-////////////////////////////////////////////////////////////////////
+/**
+ * This window is displayed temporarily, in place of an instance's actual
+ * window, during the initial launch of an applet, and also during the initial
+ * download of Panda3D code if necessary.
+ *
+ * This is the base implementation; it contains no specific code to open a
+ * window.
+ */
 class P3DSplashWindow {
 public:
   P3DSplashWindow(P3DInstance *inst, bool make_visible);
@@ -51,12 +48,32 @@ public:
     IP_button_click,
     IP_none
   };
+  enum FontStyle {
+    FS_normal,
+    FS_italic,
+    FS_oblique
+  };
+  enum FontWeight {
+    FW_normal = 400,
+    FW_medium = 500,
+    FW_bold = 700,
+    FW_black = 900
+  };
 
   virtual void set_image_filename(const string &image_filename,
                                   ImagePlacement image_placement);
-  virtual void set_fgcolor(int r, int g, int b);
-  virtual void set_bgcolor(int r, int g, int b);
-  virtual void set_barcolor(int r, int g, int b);
+  void set_fgcolor(int r, int g, int b);
+  void set_bgcolor(int r, int g, int b);
+  void set_barcolor(int r, int g, int b);
+  void set_bar_bgcolor(int r, int g, int b);
+  void set_bar_border(int border);
+  void set_bar_bottom(int bottom);
+  void set_bar_width(int width, bool percent=false);
+  void set_bar_height(int height, bool percent=false);
+  void set_font_family(const string &family);
+  void set_font_size(int size);
+  void set_font_style(FontStyle style);
+  void set_font_weight(int weight);
   virtual void set_install_label(const string &install_label);
   virtual void set_install_progress(double install_progress,
                                     bool is_progress_known, size_t received_data);
@@ -67,9 +84,9 @@ public:
   virtual void request_keyboard_focus();
 
 protected:
-  // This ImageData base class provides minimal functionality for
-  // storing a loaded image.  Most of the real meat of this class is
-  // provided by the various subclasses.
+  // This ImageData base class provides minimal functionality for storing a
+  // loaded image.  Most of the real meat of this class is provided by the
+  // various subclasses.
   class ImageData {
   public:
     inline ImageData();
@@ -105,6 +122,19 @@ protected:
   int _fgcolor_r, _fgcolor_g, _fgcolor_b;
   int _bgcolor_r, _bgcolor_g, _bgcolor_b;
   int _barcolor_r, _barcolor_g, _barcolor_b;
+  int _bar_bgcolor_r, _bar_bgcolor_g, _bar_bgcolor_b;
+  int _bar_border;
+
+private:
+  int _bar_bottom;
+  int _bar_width, _bar_height;
+  double _bar_width_ratio, _bar_height_ratio;
+
+protected:
+  string _font_family;
+  int _font_size;
+  FontStyle _font_style;
+  int _font_weight;
 
   // The region of the window for accepting button clicks.
   int _button_width, _button_height;

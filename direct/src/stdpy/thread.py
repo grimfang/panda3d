@@ -21,7 +21,7 @@ from panda3d import core
 forceYield = core.Thread.forceYield
 considerYield = core.Thread.considerYield
 
-class error(StandardError):
+class error(Exception):
     pass
 
 class LockType:
@@ -54,7 +54,7 @@ class LockType:
         self.__lock.acquire()
         try:
             if not self.__locked:
-                raise error, 'Releasing unheld lock.'
+                raise error('Releasing unheld lock.')
 
             self.__locked = False
             self.__cvar.notify()
@@ -69,6 +69,13 @@ class LockType:
 
     def __exit__(self, t, v, tb):
         self.release()
+
+# Helper to generate new thread names
+_counter = 0
+def _newname(template="Thread-%d"):
+    global _counter
+    _counter = _counter + 1
+    return template % _counter
 
 _threads = {}
 _nextThreadId = 0
@@ -95,7 +102,7 @@ def start_new_thread(function, args, kwargs = {}, name = None):
             name = 'PythonThread-%s' % (threadId)
 
         thread = core.PythonThread(threadFunc, [threadId], name, name)
-        thread.setPythonData(threadId)
+        thread.setPythonIndex(threadId)
         _threads[threadId] = (thread, {}, None)
 
         thread.start(core.TPNormal, False)
@@ -114,7 +121,7 @@ def _add_thread(thread, wrapper):
         threadId = _nextThreadId
         _nextThreadId += 1
 
-        thread.setPythonData(threadId)
+        thread.setPythonIndex(threadId)
         _threads[threadId] = (thread, {}, wrapper)
         return threadId
 
@@ -126,8 +133,8 @@ def _get_thread_wrapper(thread, wrapperClass):
     is not one, creates an instance of the indicated wrapperClass
     instead. """
 
-    threadId = thread.getPythonData()
-    if threadId is None:
+    threadId = thread.getPythonIndex()
+    if threadId == -1:
         # The thread has never been assigned a threadId.  Go assign one.
 
         global _nextThreadId
@@ -136,7 +143,7 @@ def _get_thread_wrapper(thread, wrapperClass):
             threadId = _nextThreadId
             _nextThreadId += 1
 
-            thread.setPythonData(threadId)
+            thread.setPythonIndex(threadId)
             wrapper = wrapperClass(thread, threadId)
             _threads[threadId] = (thread, {}, wrapper)
             return wrapper
@@ -162,8 +169,8 @@ def _get_thread_locals(thread, i):
     """ Returns the locals dictionary for the indicated thread.  If
     there is not one, creates an empty dictionary. """
 
-    threadId = thread.getPythonData()
-    if threadId is None:
+    threadId = thread.getPythonIndex()
+    if threadId == -1:
         # The thread has never been assigned a threadId.  Go assign one.
 
         global _nextThreadId
@@ -172,7 +179,7 @@ def _get_thread_locals(thread, i):
             threadId = _nextThreadId
             _nextThreadId += 1
 
-            thread.setPythonData(threadId)
+            thread.setPythonIndex(threadId)
             locals = {}
             _threads[threadId] = (thread, locals, None)
             return locals.setdefault(i, {})
@@ -198,9 +205,9 @@ def _remove_thread_id(threadId):
     _threadsLock.acquire()
     try:
         thread, locals, wrapper = _threads[threadId]
-        assert thread.getPythonData() == threadId
+        assert thread.getPythonIndex() == threadId
         del _threads[threadId]
-        thread.setPythonData(None)
+        thread.setPythonIndex(-1)
 
     finally:
         _threadsLock.release()
@@ -233,7 +240,7 @@ class _local(object):
         # Delete this key from all threads.
         _threadsLock.acquire()
         try:
-            for thread, locals, wrapper in _threads.values():
+            for thread, locals, wrapper in list(_threads.values()):
                 try:
                     del locals[i]
                 except KeyError:

@@ -1,29 +1,27 @@
-// Filename: lquaternion_src.h
-// Created by:  frang (06Jun00)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file lquaternion_src.h
+ * @author frang
+ * @date 2000-06-06
+ */
 
-////////////////////////////////////////////////////////////////////
-//       Class : FLOATNAME(LQuaternion)
-// Description : This is the base quaternion class
-////////////////////////////////////////////////////////////////////
+/**
+ * This is the base quaternion class
+ */
 class EXPCL_PANDA_LINMATH FLOATNAME(LQuaternion) : public FLOATNAME(LVecBase4) {
 PUBLISHED:
   INLINE_LINMATH FLOATNAME(LQuaternion)();
   INLINE_LINMATH FLOATNAME(LQuaternion)(const FLOATNAME(LVecBase4) &copy);
-  INLINE_LINMATH FLOATNAME(LQuaternion)(FLOATTYPE, const FLOATNAME(LVecBase3) &copy);
-  INLINE_LINMATH FLOATNAME(LQuaternion)(FLOATTYPE, FLOATTYPE, FLOATTYPE, FLOATTYPE);
+  INLINE_LINMATH FLOATNAME(LQuaternion)(FLOATTYPE r, const FLOATNAME(LVecBase3) &copy);
+  INLINE_LINMATH FLOATNAME(LQuaternion)(FLOATTYPE r, FLOATTYPE i, FLOATTYPE j, FLOATTYPE k);
 
-  static FLOATNAME(LQuaternion) pure_imaginary(const FLOATNAME(LVector3) &);
+  static FLOATNAME(LQuaternion) pure_imaginary(const FLOATNAME(LVector3) &v);
 
   INLINE_LINMATH FLOATNAME(LQuaternion) conjugate() const;
 

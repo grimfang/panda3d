@@ -1,16 +1,15 @@
-// Filename: rocketInputHandler.cxx
-// Created by:  rdb (20Dec11)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file rocketInputHandler.cxx
+ * @author rdb
+ * @date 2011-12-20
+ */
 
 #include "rocketInputHandler.h"
 #include "buttonEventList.h"
@@ -20,20 +19,22 @@
 #include "keyboardButton.h"
 #include "mouseButton.h"
 
+#ifndef CPPPARSER
 #include <Rocket/Core/Input.h>
 
 using namespace Rocket::Core::Input;
+#endif
 
 TypeHandle RocketInputHandler::_type_handle;
 
-////////////////////////////////////////////////////////////////////
-//     Function: RocketInputHandler::Constructor
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 RocketInputHandler::
 RocketInputHandler(const string &name) :
   DataNode(name),
+  _mouse_xy(-1),
+  _mouse_xy_changed(false),
   _modifiers(0),
   _wheel_delta(0)
 {
@@ -41,21 +42,17 @@ RocketInputHandler(const string &name) :
   _button_events_input = define_input("button_events", ButtonEventList::get_class_type());
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: RocketInputHandler::Destructor
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 RocketInputHandler::
 ~RocketInputHandler() {
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: RocketInputHandler::get_rocket_key
-//       Access: Published
-//  Description: Returns the libRocket KeyIdentifier for the given
-//               ButtonHandle, or KI_UNKNOWN (0) if it wasn't known.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the libRocket KeyIdentifier for the given ButtonHandle, or
+ * KI_UNKNOWN (0) if it wasn't known.
+ */
 int RocketInputHandler::
 get_rocket_key(const ButtonHandle handle) {
   static pmap<int, int> keymap;
@@ -113,6 +110,23 @@ get_rocket_key(const ButtonHandle handle) {
   keymap[KeyboardButton::rshift().get_index()]       = KI_RSHIFT;
   keymap[KeyboardButton::scroll_lock().get_index()]  = KI_SCROLL;
 
+  // these "OEM" keys have standard mappings in Panda3D
+  keymap[KeyboardButton::ascii_key(';').get_index()]  = KI_OEM_1;
+  keymap[KeyboardButton::ascii_key('=').get_index()]  = KI_OEM_PLUS;
+  keymap[KeyboardButton::ascii_key(',').get_index()]  = KI_OEM_COMMA;
+  keymap[KeyboardButton::ascii_key('-').get_index()]  = KI_OEM_MINUS;
+  keymap[KeyboardButton::ascii_key('.').get_index()]  = KI_OEM_PERIOD;
+  keymap[KeyboardButton::ascii_key('/').get_index()]  = KI_OEM_2;
+  keymap[KeyboardButton::ascii_key('`').get_index()]  = KI_OEM_3;
+  keymap[KeyboardButton::ascii_key('[').get_index()]  = KI_OEM_4;
+  keymap[KeyboardButton::ascii_key('\\').get_index()] = KI_OEM_5;
+  keymap[KeyboardButton::ascii_key(']').get_index()]  = KI_OEM_6;
+
+  // comment says this may either be "<>" or "\|", but "\" (unshifted) is
+  // handled already, and "<" is only available "shifted" on 101-keyboards, so
+  // assume it's this one...
+  keymap[KeyboardButton::ascii_key('<').get_index()]  = KI_OEM_102;
+
   for (char c = 'a'; c <= 'z'; ++c) {
     keymap[KeyboardButton::ascii_key(c).get_index()] = (c - 'a') + KI_A;
   }
@@ -127,23 +141,17 @@ get_rocket_key(const ButtonHandle handle) {
   return 0;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: RocketInputHandler::do_transmit_data
-//       Access: Protected, Virtual
-//  Description: The virtual implementation of transmit_data().  This
-//               function receives an array of input parameters and
-//               should generate an array of output parameters.  The
-//               input parameters may be accessed with the index
-//               numbers returned by the define_input() calls that
-//               were made earlier (presumably in the constructor);
-//               likewise, the output parameters should be set with
-//               the index numbers returned by the define_output()
-//               calls.
-////////////////////////////////////////////////////////////////////
+/**
+ * The virtual implementation of transmit_data().  This function receives an
+ * array of input parameters and should generate an array of output
+ * parameters.  The input parameters may be accessed with the index numbers
+ * returned by the define_input() calls that were made earlier (presumably in
+ * the constructor); likewise, the output parameters should be set with the
+ * index numbers returned by the define_output() calls.
+ */
 void RocketInputHandler::
 do_transmit_data(DataGraphTraverser *trav, const DataNodeTransmit &input,
                  DataNodeTransmit &output) {
-  Thread *current_thread = trav->get_current_thread();
   MutexHolder holder(_lock);
 
   if (input.has_data(_pixel_xy_input)) {
@@ -248,7 +256,8 @@ do_transmit_data(DataGraphTraverser *trav, const DataNodeTransmit &input,
         break;
 
       case ButtonEvent::T_keystroke:
-        // Ignore control characters; otherwise, they actually get added to strings in the UI.
+        // Ignore control characters; otherwise, they actually get added to
+        // strings in the UI.
         if (be._keycode > 0x1F && (be._keycode < 0x7F || be._keycode > 0x9F)) {
           _text_input.push_back(be._keycode);
         }
@@ -273,40 +282,13 @@ do_transmit_data(DataGraphTraverser *trav, const DataNodeTransmit &input,
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: RocketInputHandler::update_context
-//       Access: Public
-//  Description: Updates the libRocket context with the changes
-//               that we have gathered in do_transmit_data.
-//               Also calls Update() on the context.
-////////////////////////////////////////////////////////////////////
+/**
+ * Updates the libRocket context with the changes that we have gathered in
+ * do_transmit_data.  Also calls Update() on the context.
+ */
 void RocketInputHandler::
 update_context(Rocket::Core::Context *context, int xoffs, int yoffs) {
   MutexHolder holder(_lock);
-
-  if (_mouse_xy_changed) {
-    _mouse_xy_changed = false;
-
-    context->ProcessMouseMove(_mouse_xy.get_x() - xoffs,
-                              _mouse_xy.get_y() - yoffs, _modifiers);
-  }
-
-  if (_mouse_buttons.size() > 0) {
-    ButtonActivityMap::const_iterator it;
-    for (it = _mouse_buttons.begin(); it != _mouse_buttons.end(); ++it) {
-      if (it->second) {
-        context->ProcessMouseButtonDown(it->first, _modifiers);
-      } else {
-        context->ProcessMouseButtonUp(it->first, _modifiers);
-      }
-    }
-    _mouse_buttons.clear();
-  }
-
-  if (_wheel_delta != 0) {
-    context->ProcessMouseWheel(_wheel_delta, _modifiers);
-    _wheel_delta = 0;
-  }
 
   if (_keys.size() > 0) {
     ButtonActivityMap::const_iterator it;
@@ -336,6 +318,30 @@ update_context(Rocket::Core::Context *context, int xoffs, int yoffs) {
       context->ProcessTextInput(*it);
     }
     _text_input.clear();
+  }
+
+  if (_mouse_xy_changed) {
+    _mouse_xy_changed = false;
+
+    context->ProcessMouseMove(_mouse_xy.get_x() - xoffs,
+                              _mouse_xy.get_y() - yoffs, _modifiers);
+  }
+
+  if (_mouse_buttons.size() > 0) {
+    ButtonActivityMap::const_iterator it;
+    for (it = _mouse_buttons.begin(); it != _mouse_buttons.end(); ++it) {
+      if (it->second) {
+        context->ProcessMouseButtonDown(it->first, _modifiers);
+      } else {
+        context->ProcessMouseButtonUp(it->first, _modifiers);
+      }
+    }
+    _mouse_buttons.clear();
+  }
+
+  if (_wheel_delta != 0) {
+    context->ProcessMouseWheel(_wheel_delta, _modifiers);
+    _wheel_delta = 0;
   }
 
   context->Update();

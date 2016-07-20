@@ -1,16 +1,15 @@
-// Filename: lwoToEgg.cxx
-// Created by:  drose (17Apr01)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file lwoToEgg.cxx
+ * @author drose
+ * @date 2001-04-17
+ */
 
 #include "lwoToEgg.h"
 
@@ -18,13 +17,10 @@
 #include "lwoHeader.h"
 #include "lwoInputFile.h"
 #include "config_lwo.h"
-#include "pystub.h"
 
-////////////////////////////////////////////////////////////////////
-//     Function: LwoToEgg::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 LwoToEgg::
 LwoToEgg() :
   SomethingToEgg("Lightwave", ".lwo")
@@ -57,11 +53,9 @@ LwoToEgg() :
   _coordinate_system = CS_yup_left;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: LwoToEgg::run
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void LwoToEgg::
 run() {
   _data->set_coordinate_system(_coordinate_system);
@@ -85,9 +79,6 @@ run() {
 
 
 int main(int argc, char *argv[]) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   init_liblwo();
   LwoToEgg prog;
   prog.parse_command_line(argc, argv);

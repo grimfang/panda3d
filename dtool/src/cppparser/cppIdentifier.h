@@ -1,16 +1,15 @@
-// Filename: cppIdentifier.h
-// Created by:  drose (26Oct99)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file cppIdentifier.h
+ * @author drose
+ * @date 1999-10-26
+ */
 
 #ifndef CPPIDENTIFIER_H
 #define CPPIDENTIFIER_H
@@ -20,6 +19,7 @@
 #include "cppDeclaration.h"
 #include "cppNameComponent.h"
 #include "cppFile.h"
+#include "cppBisonDefs.h"
 
 #include <string>
 #include <vector>
@@ -29,14 +29,15 @@ class CPPType;
 class CPPPreprocessor;
 class CPPTemplateParameterList;
 
-///////////////////////////////////////////////////////////////////
-//       Class : CPPIdentifier
-// Description :
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 class CPPIdentifier {
 public:
   CPPIdentifier(const string &name, const CPPFile &file = CPPFile());
   CPPIdentifier(const CPPNameComponent &name, const CPPFile &file = CPPFile());
+  CPPIdentifier(const string &name, const cppyyltype &loc);
+  CPPIdentifier(const CPPNameComponent &name, const cppyyltype &loc);
   void add_name(const string &name);
   void add_name(const CPPNameComponent &name);
 
@@ -91,7 +92,7 @@ public:
   typedef vector<CPPNameComponent> Names;
   Names _names;
   CPPScope *_native_scope;
-  CPPFile _file;
+  cppyyltype _loc;
 };
 
 inline ostream &operator << (ostream &out, const CPPIdentifier &identifier) {

@@ -1,27 +1,22 @@
-// Filename: test_lwo.cxx
-// Created by:  drose (24Apr01)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file test_lwo.cxx
+ * @author drose
+ * @date 2001-04-24
+ */
 
 #include "lwoInputFile.h"
 #include "lwoChunk.h"
 #include "config_lwo.h"
-#include "pystub.h"
 
 int
 main(int argc, char *argv[]) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   init_liblwo();
   if (argc != 2) {
     nout << "test_lwo file.lwo\n";

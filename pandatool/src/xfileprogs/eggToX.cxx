@@ -1,26 +1,22 @@
-// Filename: eggToX.cxx
-// Created by:  drose (19Jun01)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file eggToX.cxx
+ * @author drose
+ * @date 2001-06-19
+ */
 
 #include "eggToX.h"
 #include "config_xfile.h"
-#include "pystub.h"
 
-////////////////////////////////////////////////////////////////////
-//     Function: EggToX::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 EggToX::
 EggToX() : EggToSomething("DirectX", ".x", true, false) {
   add_texture_options();
@@ -51,11 +47,9 @@ EggToX() : EggToSomething("DirectX", ".x", true, false) {
 }
 
 
-////////////////////////////////////////////////////////////////////
-//     Function: EggToX::run
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void EggToX::
 run() {
   if (!do_reader_options()) {
@@ -75,9 +69,6 @@ run() {
 
 
 int main(int argc, char *argv[]) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   init_libxfile();
   EggToX prog;
   prog.parse_command_line(argc, argv);

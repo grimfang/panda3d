@@ -1,29 +1,24 @@
-// Filename: binToC.cxx
-// Created by:  drose (18Jul03)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
-
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file binToC.cxx
+ * @author drose
+ * @date 2003-07-18
+ */
 
 #include "binToC.h"
-#include "pystub.h"
 
 // The number of bytes across the page to write.
 static const int col_width = 11;
 
-////////////////////////////////////////////////////////////////////
-//     Function: BinToC::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 BinToC::
 BinToC() :
   WithOutputFile(true, true, false)
@@ -66,11 +61,9 @@ BinToC() :
   _table_name = "data";
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: BinToC::run
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void BinToC::
 run() {
   ifstream in;
@@ -88,9 +81,8 @@ run() {
   string table_type = "const unsigned char ";
   string length_type = "const int ";
   if (_for_string) {
-    // Actually, declaring the table as "const char" causes VC7 to
-    // yell about truncating all of the values >= 0x80.
-    // table_type = "const char ";
+    // Actually, declaring the table as "const char" causes VC7 to yell about
+    // truncating all of the values >= 0x80. table_type = "const char ";
     length_type = "const size_t ";
   }
 
@@ -128,11 +120,9 @@ run() {
       << dec << count << ";\n\n";
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: BinToC::handle_args
-//       Access: Protected, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool BinToC::
 handle_args(ProgramBase::Args &args) {
   if (args.size() == 2 && !_got_output_filename) {
@@ -153,9 +143,6 @@ handle_args(ProgramBase::Args &args) {
 
 
 int main(int argc, char *argv[]) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   BinToC prog;
   prog.parse_command_line(argc, argv);
   prog.run();

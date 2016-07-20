@@ -1,16 +1,15 @@
-// Filename: openSSLWrapper.h
-// Created by:  drose (05Sep09)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file openSSLWrapper.h
+ * @author drose
+ * @date 2009-09-05
+ */
 
 #ifndef OPENSSLWRAPPER_H
 #define OPENSSLWRAPPER_H
@@ -24,7 +23,10 @@
 #include <winsock2.h>  // must be included prior to including OpenSSL.
 #endif
 
+#ifndef OPENSSL_NO_KRB5
 #define OPENSSL_NO_KRB5
+#endif
+
 #include "openssl/ssl.h"
 #include "openssl/rand.h"
 #include "openssl/err.h"
@@ -36,13 +38,11 @@
 #undef X509_NAME
 #endif
 
-////////////////////////////////////////////////////////////////////
-//       Class : OpenSSLWrapper
-// Description : Provides an interface wrapper around the OpenSSL
-//               library, to ensure that the library is properly
-//               initialized in the application, and to provide some
-//               hooks into global OpenSSL context data.
-////////////////////////////////////////////////////////////////////
+/**
+ * Provides an interface wrapper around the OpenSSL library, to ensure that
+ * the library is properly initialized in the application, and to provide some
+ * hooks into global OpenSSL context data.
+ */
 class EXPCL_PANDAEXPRESS OpenSSLWrapper {
 private:
   OpenSSLWrapper();

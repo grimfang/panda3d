@@ -1,26 +1,22 @@
-// Filename: imageTrans.cxx
-// Created by:  drose (19Jun00)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file imageTrans.cxx
+ * @author drose
+ * @date 2000-06-19
+ */
 
 #include "imageTrans.h"
 #include "string_utils.h"
-#include "pystub.h"
 
-////////////////////////////////////////////////////////////////////
-//     Function: ImageTrans::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 ImageTrans::
 ImageTrans() : ImageFilter(true) {
   set_program_brief("apply transformations to an image file");
@@ -68,11 +64,9 @@ ImageTrans() : ImageFilter(true) {
   _color_scale.set(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ImageTrans::run
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void ImageTrans::
 run() {
   switch (_channels) {
@@ -146,11 +140,9 @@ run() {
   write_image();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ImageTrans::dispatch_channels
-//       Access: Private, Static
-//  Description: Interprets the -chan parameter.
-////////////////////////////////////////////////////////////////////
+/**
+ * Interprets the -chan parameter.
+ */
 bool ImageTrans::
 dispatch_channels(const string &opt, const string &arg, void *var) {
   Channels *ip = (Channels *)var;
@@ -187,12 +179,9 @@ dispatch_channels(const string &opt, const string &arg, void *var) {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ImageTrans::extract_alpha
-//       Access: Private
-//  Description: Extracts out just the alpha channel and stores it as
-//               a grayscale image.
-////////////////////////////////////////////////////////////////////
+/**
+ * Extracts out just the alpha channel and stores it as a grayscale image.
+ */
 void ImageTrans::
 extract_alpha() {
   if (!_image.has_alpha()) {
@@ -213,9 +202,6 @@ extract_alpha() {
 
 
 int main(int argc, char *argv[]) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   ImageTrans prog;
   prog.parse_command_line(argc, argv);
   prog.run();

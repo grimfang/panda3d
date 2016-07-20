@@ -1,16 +1,15 @@
-// Filename: cullResult.h
-// Created by:  drose (27Feb02)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file cullResult.h
+ * @author drose
+ * @date 2002-02-27
+ */
 
 #ifndef CULLRESULT_H
 #define CULLRESULT_H
@@ -26,6 +25,7 @@
 #include "pvector.h"
 #include "pset.h"
 #include "pmap.h"
+#include "rescaleNormalAttrib.h"
 
 class CullTraverser;
 class GraphicsStateGuardianBase;
@@ -33,17 +33,14 @@ class RenderState;
 class SceneSetup;
 class TransformState;
 
-////////////////////////////////////////////////////////////////////
-//       Class : CullResult
-// Description : This stores the result of a BinCullHandler traversal:
-//               an ordered collection of CullBins, each of which
-//               holds a number of Geoms and RenderStates to be
-//               rendered in some defined order.
-//
-//               This is also used to keep the results of last frame's
-//               cull traversal around to make next frame's traversal
-//               of the same scene a little easier.
-////////////////////////////////////////////////////////////////////
+/**
+ * This stores the result of a BinCullHandler traversal: an ordered collection
+ * of CullBins, each of which holds a number of Geoms and RenderStates to be
+ * rendered in some defined order.
+ *
+ * This is also used to keep the results of last frame's cull traversal around
+ * to make next frame's traversal of the same scene a little easier.
+ */
 class EXPCL_PANDA_PGRAPH CullResult : public ReferenceCount {
 public:
   CullResult(GraphicsStateGuardianBase *gsg,
@@ -74,10 +71,12 @@ private:
   void apply_flash_color(CPT(RenderState) &state, const LColor &flash_color);
 #endif
 
-  static CPT(RenderState) get_alpha_state();
-  static CPT(RenderState) get_binary_state();
-  static CPT(RenderState) get_dual_transparent_state();
-  static CPT(RenderState) get_dual_opaque_state();
+  static const RenderState *get_rescale_normal_state(RescaleNormalAttrib::Mode mode);
+  static const RenderState *get_alpha_state();
+  static const RenderState *get_binary_state();
+  static const RenderState *get_dual_transparent_state();
+  static const RenderState *get_dual_opaque_state();
+  static const RenderState *get_wireframe_filled_state();
   static CPT(RenderState) get_wireframe_overlay_state(const RenderModeAttrib *rmode);
 
   GraphicsStateGuardianBase *_gsg;
@@ -107,4 +106,3 @@ private:
 #include "cullResult.I"
 
 #endif
-

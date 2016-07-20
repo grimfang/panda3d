@@ -2,9 +2,8 @@
 
 __all__ = ['DirectLabel']
 
-from pandac.PandaModules import *
-import DirectGuiGlobals as DGG
-from DirectFrame import *
+from panda3d.core import *
+from .DirectFrame import *
 
 class DirectLabel(DirectFrame):
     """
@@ -35,7 +34,7 @@ class DirectLabel(DirectFrame):
 
         # Initialize superclasses
         DirectFrame.__init__(self, parent)
-        
+
         # Call option initialization functions
         self.initialiseoptions(DirectLabel)
 

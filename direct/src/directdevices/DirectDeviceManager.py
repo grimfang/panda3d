@@ -1,7 +1,8 @@
 """ Class used to create and control vrpn devices """
 
 from direct.showbase.DirectObject import DirectObject
-from pandac.PandaModules import *
+from panda3d.core import *
+from panda3d.vrpn import *
 
 ANALOG_MIN = -0.95
 ANALOG_MAX = 0.95
@@ -22,7 +23,7 @@ class DirectDeviceManager(VrpnClient, DirectObject):
             self.server = server
         else:
             # Check config file, if that fails, use default
-            self.server = myBase.config.GetString('vrpn-server', 'spacedyne')
+            self.server = ConfigVariableString('vrpn-server', 'spacedyne').getValue()
 
         # Create a vrpn client
         VrpnClient.__init__(self, self.server)
@@ -47,10 +48,10 @@ class DirectButtons(ButtonNode, DirectObject):
     def __init__(self, vrpnClient, device):
         # Keep track of number of buttons created
         DirectButtons.buttonCount += 1
-        # Create a unique name for this button object
-        self.name = 'DirectButtons-' + repr(DirectButtons.buttonCount)
         # Create a new button node for the given device
         ButtonNode.__init__(self, vrpnClient, device)
+        # Create a unique name for this button object
+        self.name = 'DirectButtons-' + repr(DirectButtons.buttonCount)
         # Attach node to data graph
         self.nodePath = myBase.dataRoot.attachNewNode(self)
 
@@ -85,10 +86,10 @@ class DirectAnalogs(AnalogNode, DirectObject):
     def __init__(self, vrpnClient, device):
         # Keep track of number of analogs created
         DirectAnalogs.analogCount += 1
-        # Create a unique name for this analog object
-        self.name = 'DirectAnalogs-' + repr(DirectAnalogs.analogCount)
         # Create a new analog node for the given device
         AnalogNode.__init__(self, vrpnClient, device)
+        # Create a unique name for this analog object
+        self.name = 'DirectAnalogs-' + repr(DirectAnalogs.analogCount)
         # Attach node to data graph
         self.nodePath = myBase.dataRoot.attachNewNode(self)
         # See if any of the general analog parameters are dconfig'd
@@ -181,10 +182,10 @@ class DirectTracker(TrackerNode, DirectObject):
     def __init__(self, vrpnClient, device):
         # Keep track of number of trackers created
         DirectTracker.trackerCount += 1
-        # Create a unique name for this tracker object
-        self.name = 'DirectTracker-' + repr(DirectTracker.trackerCount)
         # Create a new tracker node for the given device
         TrackerNode.__init__(self, vrpnClient, device)
+        # Create a unique name for this tracker object
+        self.name = 'DirectTracker-' + repr(DirectTracker.trackerCount)
         # Attach node to data graph
         self.nodePath = myBase.dataRoot.attachNewNode(self)
 
@@ -208,10 +209,10 @@ class DirectDials(DialNode, DirectObject):
     def __init__(self, vrpnClient, device):
         # Keep track of number of dials created
         DirectDials.dialCount += 1
-        # Create a unique name for this dial object
-        self.name = 'DirectDials-' + repr(DirectDials.dialCount)
         # Create a new dial node for the given device
         DialNode.__init__(self, vrpnClient, device)
+        # Create a unique name for this dial object
+        self.name = 'DirectDials-' + repr(DirectDials.dialCount)
         # Attach node to data graph
         self.nodePath = myBase.dataRoot.attachNewNode(self)
 
@@ -248,6 +249,8 @@ class DirectTimecodeReader(AnalogNode, DirectObject):
     def __init__(self, vrpnClient, device):
         # Keep track of number of timecodeReader created
         DirectTimecodeReader.timecodeReaderCount += 1
+        # Create a new dial node for the given device
+        AnalogNode.__init__(self, vrpnClient, device)
         # Create a unique name for this dial object
         self.name = ('DirectTimecodeReader-' +
                      repr(DirectTimecodeReader.timecodeReaderCount))
@@ -256,8 +259,6 @@ class DirectTimecodeReader(AnalogNode, DirectObject):
         self.seconds = 0
         self.minutes = 0
         self.hours = 0
-        # Create a new dial node for the given device
-        AnalogNode.__init__(self, vrpnClient, device)
         # Attach node to data graph
         self.nodePath = myBase.dataRoot.attachNewNode(self)
 
@@ -294,18 +295,3 @@ class DirectTimecodeReader(AnalogNode, DirectObject):
     def __repr__(self):
         str = ('%s: %d:%d:%d:%d' % ((self.name,) + self.getTime()[:-1]))
         return str
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

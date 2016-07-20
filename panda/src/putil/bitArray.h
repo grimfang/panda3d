@@ -1,16 +1,15 @@
-// Filename: bitArray.h
-// Created by:  drose (20Jan06)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file bitArray.h
+ * @author drose
+ * @date 2006-01-20
+ */
 
 #ifndef BITARRAY_H
 #define BITARRAY_H
@@ -31,14 +30,12 @@ class BamReader;
 class Datagram;
 class DatagramIterator;
 
-////////////////////////////////////////////////////////////////////
-//       Class : BitArray
-// Description : A dynamic array with an unlimited number of bits.
-//
-//               This is similar to a BitMask, except it appears to
-//               contain an infinite number of bits.  You can use it
-//               very much as you would use a BitMask.
-////////////////////////////////////////////////////////////////////
+/**
+ * A dynamic array with an unlimited number of bits.
+ *
+ * This is similar to a BitMask, except it appears to contain an infinite
+ * number of bits.  You can use it very much as you would use a BitMask.
+ */
 class EXPCL_PANDA_PUTIL BitArray {
 public:
   typedef BitMaskNative MaskType;
@@ -65,7 +62,7 @@ PUBLISHED:
   CONSTEXPR static int get_max_num_bits();
 
   CONSTEXPR static int get_num_bits_per_word();
-  INLINE int get_num_bits() const;
+  INLINE size_t get_num_bits() const;
   INLINE bool get_bit(int index) const;
   INLINE void set_bit(int index);
   INLINE void clear_bit(int index);
@@ -90,9 +87,9 @@ PUBLISHED:
   int get_highest_off_bit() const;
   int get_next_higher_different_bit(int low_bit) const;
 
-  INLINE int get_num_words() const;
-  INLINE MaskType get_word(int n) const;
-  INLINE void set_word(int n, WordType value);
+  INLINE size_t get_num_words() const;
+  INLINE MaskType get_word(size_t n) const;
+  INLINE void set_word(size_t n, WordType value);
 
   void invert_in_place();
   bool has_bits_in_common(const BitArray &other) const;

@@ -1,16 +1,17 @@
-// Filename: shader.h
-// Created by: jyelon (01Sep05)
-// Updated by: fperazzi, PandaSE(29Apr10) (added SAT_sampler2dArray)
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file shader.h
+ * @author jyelon
+ * @date 2005-09-01
+ * @author fperazzi, PandaSE
+ * @date 2010-04-29
+ */
 
 #ifndef SHADER_H
 #define SHADER_H
@@ -33,26 +34,25 @@
 #include "epvector.h"
 
 #ifdef HAVE_CG
-// I don't want to include the Cg header file into panda as a
-// whole.  Instead, I'll just excerpt some opaque declarations.
+// I don't want to include the Cg header file into panda as a whole.  Instead,
+// I'll just excerpt some opaque declarations.
 typedef struct _CGcontext   *CGcontext;
 typedef struct _CGprogram   *CGprogram;
 typedef struct _CGparameter *CGparameter;
 #endif
 
-////////////////////////////////////////////////////////////////////
-//       Class : Shader
-//      Summary: The Shader class is meant to select the Shader Language,
-//               select the available profile, compile the shader, and
-//               finally compile and store the shader parameters
-//               in the appropriate structure.
-////////////////////////////////////////////////////////////////////
+class BamCacheRecord;
+
+/**
+
+ */
 class EXPCL_PANDA_GOBJ Shader : public TypedWritableReferenceCount {
 PUBLISHED:
   enum ShaderLanguage {
     SL_none,
     SL_Cg,
-    SL_GLSL
+    SL_GLSL,
+    SL_HLSL,
   };
 
   enum ShaderType {
@@ -97,14 +97,17 @@ PUBLISHED:
                          const string &tess_evaluation = "");
   static PT(Shader) make_compute(ShaderLanguage lang, const string &body);
 
-  INLINE Filename get_filename(const ShaderType &type = ST_none) const;
-  INLINE const string &get_text(const ShaderType &type = ST_none) const;
+  INLINE Filename get_filename(ShaderType type = ST_none) const;
+  INLINE void set_filename(ShaderType type, const Filename &filename);
+  INLINE const string &get_text(ShaderType type = ST_none) const;
   INLINE bool get_error_flag() const;
   INLINE ShaderLanguage get_language() const;
 
-  INLINE static ShaderUtilization get_shader_utilization();
-  INLINE static void set_shader_utilization(ShaderUtilization utl);
-  INLINE static bool have_shader_utilization();
+  INLINE bool has_fullpath() const;
+  INLINE const Filename &get_fullpath() const;
+
+  INLINE bool get_cache_compiled_shader() const;
+  INLINE void set_cache_compiled_shader(bool flag);
 
   void prepare(PreparedGraphicsObjects *prepared_objects);
   bool is_prepared(PreparedGraphicsObjects *prepared_objects) const;
@@ -132,7 +135,7 @@ public:
     SMO_plight_x,
     SMO_slight_x,
     SMO_satten_x,
-    SMO_texmat_x,
+    SMO_texmat_i,
     SMO_plane_x,
     SMO_clipplane_x,
 
@@ -191,7 +194,25 @@ public:
     SMO_apiview_to_apiclip,
     SMO_apiclip_to_apiview,
 
+    SMO_inv_texmat_i,
+
+    // Additional properties for PBR materials
+    SMO_attr_material2,
+
+    // Hack for text rendering.  Don't use in user shaders.
+    SMO_tex_is_alpha_i,
+
     SMO_INVALID
+  };
+
+  enum ShaderTexInput {
+    STO_INVALID,
+
+    STO_named_input,
+    STO_named_stage,
+
+    STO_stage_i,
+    STO_light_i_shadow_map,
   };
 
   enum ShaderArgClass {
@@ -228,8 +249,10 @@ public:
     SAT_sampler1d,
     SAT_sampler2d,
     SAT_sampler3d,
-    SAT_sampler2dArray,
-    SAT_samplercube,
+    SAT_sampler2d_array,
+    SAT_sampler_cube,
+    SAT_sampler_buffer,
+    SAT_sampler_cube_array,
     SAT_unknown
 };
 
@@ -257,6 +280,8 @@ public:
     SMP_upper3x3,
     SMP_transpose3x3,
     SMP_cell15,
+    SMP_cell14,
+    SMP_cell13,
   };
 
   enum ShaderStateDep {
@@ -270,6 +295,10 @@ public:
     SSD_fog           = 0x040,
     SSD_light         = 0x080,
     SSD_clip_planes   = 0x100,
+    SSD_tex_matrix    = 0x200,
+    SSD_frame         = 0x400,
+    SSD_projection    = 0x800,
+    SSD_texture      = 0x1000,
   };
 
   enum ShaderBug {
@@ -297,6 +326,7 @@ public:
     ShaderArgType     _type;
     ShaderArgDir      _direction;
     bool              _varying;
+    bool              _integer;
     NotifyCategory   *_cat;
   };
 
@@ -371,6 +401,7 @@ public:
   struct ShaderTexSpec {
     ShaderArgId       _id;
     PT(InternalName)  _name;
+    ShaderTexInput    _part;
     int               _stage;
     int               _desired_type;
     PT(InternalName)  _suffix;
@@ -444,9 +475,9 @@ public:
   };
 
 public:
-  // These routines help split the shader into sections,
-  // for those shader implementations that need to do so.
-  // Don't use them when you use separate shader programs.
+  // These routines help split the shader into sections, for those shader
+  // implementations that need to do so.  Don't use them when you use separate
+  // shader programs.
   void parse_init();
   void parse_line(string &result, bool rt, bool lt);
   void parse_upto(string &result, string pattern, bool include);
@@ -478,16 +509,12 @@ public:
                           bool &success);
 #endif
 
-  bool compile_parameter(const ShaderArgId        &arg_id,
-                         const ShaderArgClass     &arg_class,
-                         const ShaderArgClass     &arg_subclass,
-                         const ShaderArgType      &arg_type,
-                         const ShaderArgDir       &arg_direction,
-                         bool                      arg_varying,
-                         int                      *arg_dim,
-                         NotifyCategory           *arg_cat);
+  bool compile_parameter(ShaderArgInfo &p, int *arg_dim);
 
   void clear_parameters();
+
+  void set_compiled(unsigned int format, const char *data, size_t length);
+  bool get_compiled(unsigned int &format, string &binary) const;
 
 private:
 #ifdef HAVE_CG
@@ -505,8 +532,9 @@ private:
   void cg_release_resources();
   void cg_report_errors();
 
-  // Determines the appropriate cg profile settings and stores them in the active shader caps
-  // based on any profile settings stored in the shader's header
+  // Determines the appropriate cg profile settings and stores them in the
+  // active shader caps based on any profile settings stored in the shader's
+  // header
   void cg_get_profile_from_header(ShaderCaps &caps);
 
   ShaderCaps _cg_last_caps;
@@ -528,28 +556,36 @@ public:
 #endif
 
 public:
-  pvector <ShaderPtrSpec> _ptr_spec;
-  epvector <ShaderMatSpec> _mat_spec;
-  pvector <ShaderTexSpec> _tex_spec;
-  pvector <ShaderVarSpec> _var_spec;
+  pvector<ShaderPtrSpec> _ptr_spec;
+  epvector<ShaderMatSpec> _mat_spec;
+  pvector<ShaderTexSpec> _tex_spec;
+  pvector<ShaderVarSpec> _var_spec;
+  int _mat_deps;
 
   bool _error_flag;
   ShaderFile _text;
 
 protected:
   ShaderFile _filename;
+  Filename _fullpath;
   int _parse;
   bool _loaded;
   ShaderLanguage _language;
-  pvector<Filename> _included_files;
 
-  // Stores full paths, and includes the fullpaths of the shaders
-  // themselves as well as the includes.
-  pvector<Filename> _source_files;
+  typedef pvector<Filename> Filenames;
+  Filenames _included_files;
+
+  // Stores full paths, and includes the fullpaths of the shaders themselves
+  // as well as the includes.
+  Filenames _source_files;
   time_t _last_modified;
 
+  PT(BamCacheRecord) _record;
+  bool _cache_compiled_shader;
+  unsigned int _compiled_format;
+  string _compiled_binary;
+
   static ShaderCaps _default_caps;
-  static ShaderUtilization _shader_utilization;
   static int _shaders_generated;
 
   typedef pmap<ShaderFile, PT(Shader)> ShaderTable;
@@ -568,18 +604,19 @@ private:
 
   Shader(ShaderLanguage lang);
 
-  bool read(const ShaderFile &sfile);
-  bool do_read_source(string &into, const Filename &fn);
+  bool read(const ShaderFile &sfile, BamCacheRecord *record = NULL);
+  bool do_read_source(string &into, const Filename &fn, BamCacheRecord *record);
   bool r_preprocess_source(ostream &out, const Filename &fn,
                            const Filename &source_dir,
-                           set<Filename> &open_files, int depth = 0);
+                           set<Filename> &open_files,
+                           BamCacheRecord *record, int depth = 0);
 
   bool check_modified() const;
 
 public:
   ~Shader();
 
-  INLINE Filename get_filename_from_index(int index, ShaderType type) const;
+  Filename get_filename_from_index(int index, ShaderType type) const;
 
 public:
   static void register_with_read_factory();

@@ -1,29 +1,25 @@
-// Filename: lwoScan.cxx
-// Created by:  drose (24Apr01)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file lwoScan.cxx
+ * @author drose
+ * @date 2001-04-24
+ */
 
 #include "lwoScan.h"
 
 #include "lwoInputFile.h"
 #include "lwoChunk.h"
 #include "config_lwo.h"
-#include "pystub.h"
 
-////////////////////////////////////////////////////////////////////
-//     Function: LwoScan::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 LwoScan::
 LwoScan() {
   clear_runlines();
@@ -36,11 +32,9 @@ LwoScan() {
      "problems with lwo2egg.");
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: LwoScan::run
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void LwoScan::
 run() {
   LwoInputFile in;
@@ -60,11 +54,9 @@ run() {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: LwoScan::handle_args
-//       Access: Protected, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool LwoScan::
 handle_args(ProgramBase::Args &args) {
   if (args.empty()) {
@@ -84,9 +76,6 @@ handle_args(ProgramBase::Args &args) {
 
 int
 main(int argc, char *argv[]) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   init_liblwo();
   LwoScan prog;
   prog.parse_command_line(argc, argv);

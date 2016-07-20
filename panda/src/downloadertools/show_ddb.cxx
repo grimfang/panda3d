@@ -1,27 +1,22 @@
-// Filename: show_ddb.cxx
-// Created by:  drose (02Nov02)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file show_ddb.cxx
+ * @author drose
+ * @date 2002-11-02
+ */
 
 #include "pandabase.h"
-#include "pystub.h"
 #include "downloadDb.h"
 #include "filename.h"
 
 int
 main(int argc, char *argv[]) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   if (argc != 3) {
     cerr << "Usage: show_ddb server.ddb client.ddb\n";
     return 1;

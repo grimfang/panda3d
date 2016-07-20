@@ -1,38 +1,32 @@
-// Filename: lvecBase4_ext_src.I
-// Created by:  rdb (02Jan11)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file lvecBase4_ext_src.I
+ * @author rdb
+ * @date 2011-01-02
+ */
 
 #ifdef FLOATTYPE_IS_INT
 #if PY_MAJOR_VERSION >= 3
 #define PYNUMBER_FLOATTYPE PyNumber_Long
-#define PY_FROM_FLOATTYPE PyLong_FromLong
 #define PY_AS_FLOATTYPE PyLong_AS_LONG
 #else
 #define PYNUMBER_FLOATTYPE PyNumber_Int
-#define PY_FROM_FLOATTYPE PyInt_FromLong
 #define PY_AS_FLOATTYPE PyInt_AS_LONG
 #endif
 #else
 #define PYNUMBER_FLOATTYPE PyNumber_Float
-#define PY_FROM_FLOATTYPE PyFloat_FromDouble
-#define PY_AS_FLOATTYPE PyFloat_AsDouble
+#define PY_AS_FLOATTYPE (FLOATTYPE)PyFloat_AsDouble
 #endif
 
-////////////////////////////////////////////////////////////////////
-//     Function: LVecBase4::__repr__
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 INLINE_LINMATH string Extension<FLOATNAME(LVecBase4)>::
 __repr__() const {
   ostringstream out;
@@ -44,18 +38,15 @@ __repr__() const {
   return out.str();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: LVecBase4::__reduce__
-//       Access: Published
-//  Description: This special Python method is implement to provide
-//               support for the pickle module.
-////////////////////////////////////////////////////////////////////
+/**
+ * This special Python method is implement to provide support for the pickle
+ * module.
+ */
 INLINE_LINMATH PyObject *Extension<FLOATNAME(LVecBase4)>::
 __reduce__(PyObject *self) const {
-  // We should return at least a 2-tuple, (Class, (args)): the
-  // necessary class object whose constructor we should call
-  // (e.g. this), and the arguments necessary to reconstruct this
-  // object.
+  // We should return at least a 2-tuple, (Class, (args)): the necessary class
+  // object whose constructor we should call (e.g.  this), and the arguments
+  // necessary to reconstruct this object.
   PyObject *this_class = PyObject_Type(self);
   if (this_class == NULL) {
     return NULL;
@@ -76,13 +67,11 @@ __reduce__(PyObject *self) const {
   return result;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: LVecBase4::__getattr__
-//       Access: Published
-//  Description: This is used to implement swizzle masks.
-////////////////////////////////////////////////////////////////////
+/**
+ * This is used to implement swizzle masks.
+ */
 INLINE_LINMATH PyObject *Extension<FLOATNAME(LVecBase4)>::
-__getattr__(const string &attr_name) const {
+__getattr__(PyObject *self, const string &attr_name) const {
 #ifndef CPPPARSER
   extern struct Dtool_PyTypedObject FLOATNAME(Dtool_LVecBase2);
   extern struct Dtool_PyTypedObject FLOATNAME(Dtool_LVecBase3);
@@ -92,16 +81,16 @@ __getattr__(const string &attr_name) const {
   // Validate the attribute name.
   for (string::const_iterator it = attr_name.begin(); it < attr_name.end(); it++) {
     if (*it < 'w' || *it > 'z') {
-      return NULL;
+      return Dtool_Raise_AttributeError(self, attr_name.c_str());
     }
   }
 
   switch (attr_name.size()) {
     case 1:
       if (attr_name[0] == 'w') {
-        return PY_FROM_FLOATTYPE(_this->_v(3));
+        return Dtool_WrapValue(_this->_v(3));
       } else {
-        return PY_FROM_FLOATTYPE(_this->_v(attr_name[0] - 'x'));
+        return Dtool_WrapValue(_this->_v(attr_name[0] - 'x'));
       }
 
     case 2: {
@@ -127,24 +116,19 @@ __getattr__(const string &attr_name) const {
     }
   }
 
-  return NULL;
+  return Dtool_Raise_AttributeError(self, attr_name.c_str());
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: LVecBase4::__setattr__
-//       Access: Published
-//  Description: This is used to implement write masks.
-////////////////////////////////////////////////////////////////////
+/**
+ * This is used to implement write masks.
+ */
 INLINE_LINMATH int Extension<FLOATNAME(LVecBase4)>::
 __setattr__(PyObject *self, const string &attr_name, PyObject *assign) {
 #ifndef NDEBUG
   // Validate the attribute name.
   for (string::const_iterator it = attr_name.begin(); it < attr_name.end(); it++) {
     if (*it < 'w' || *it > 'z') {
-      PyTypeObject *tp = self->ob_type;
-      PyErr_Format(PyExc_AttributeError,
-                   "'%.100s' object has no attribute '%.200s'",
-                   tp->tp_name, attr_name.c_str());
+      Dtool_Raise_AttributeError(self, attr_name.c_str());
       return -1;
     }
   }
@@ -164,8 +148,8 @@ __setattr__(PyObject *self, const string &attr_name, PyObject *assign) {
       return -1;
     }
 
-    // Get a pointer to the items, iterate over it and
-    // perform our magic assignment.  Fast fast.  Oh yeah.
+    // Get a pointer to the items, iterate over it and perform our magic
+    // assignment.  Fast fast.  Oh yeah.
     PyObject** items = PySequence_Fast_ITEMS(fast);
     for (size_t i = 0; i < attr_name.size(); ++i) {
 
@@ -193,8 +177,8 @@ __setattr__(PyObject *self, const string &attr_name, PyObject *assign) {
     PyObject* fl = PYNUMBER_FLOATTYPE(assign);
 
     if (fl == NULL) {
-      // It's not a floating-point value either?
-      // Sheesh, I don't know what to do with it then.
+      // It's not a floating-point value either?  Sheesh, I don't know what to
+      // do with it then.
       if (attr_name.size() == 1) {
 #ifdef FLOATTYPE_IS_INT
         PyErr_SetString(PyExc_ValueError, "an integer is required");
@@ -210,8 +194,8 @@ __setattr__(PyObject *self, const string &attr_name, PyObject *assign) {
     FLOATTYPE value = PY_AS_FLOATTYPE(fl);
     Py_DECREF(fl);
 
-    // Loop through the components in the attribute name,
-    // and assign the floating-point value to every one of them.
+    // Loop through the components in the attribute name, and assign the
+    // floating-point value to every one of them.
     for (string::const_iterator it = attr_name.begin(); it < attr_name.end(); it++) {
       _this->_v(((*it) == 'w') ? 3 : (*it) - 'x') = value;
     }
@@ -220,11 +204,9 @@ __setattr__(PyObject *self, const string &attr_name, PyObject *assign) {
   return 0;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: LVecBase4::__pow__
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 INLINE_LINMATH FLOATNAME(LVecBase4) Extension<FLOATNAME(LVecBase4)>::
 __pow__(FLOATTYPE exponent) const {
   return FLOATNAME(LVecBase4)(
@@ -234,11 +216,9 @@ __pow__(FLOATTYPE exponent) const {
     cpow(_this->_v(3), exponent));
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: LVecBase4::__ipow__
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 INLINE_LINMATH PyObject *Extension<FLOATNAME(LVecBase4)>::
 __ipow__(PyObject *self, FLOATTYPE exponent) {
   _this->_v(0) = cpow(_this->_v(0), exponent);
@@ -250,5 +230,4 @@ __ipow__(PyObject *self, FLOATTYPE exponent) {
 }
 
 #undef PYNUMBER_FLOATTYPE
-#undef PY_FROM_FLOATTYPE
 #undef PY_AS_FLOATTYPE

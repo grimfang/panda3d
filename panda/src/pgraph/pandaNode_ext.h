@@ -1,16 +1,15 @@
-// Filename: pandaNode_ext.h
-// Created by:  CFSworks (30Mar14)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file pandaNode_ext.h
+ * @author CFSworks
+ * @date 2014-03-30
+ */
 
 #ifndef PANDANODE_EXT_H
 #define PANDANODE_EXT_H
@@ -23,12 +22,10 @@
 #include "pandaNode.h"
 #include "py_panda.h"
 
-////////////////////////////////////////////////////////////////////
-//       Class : Extension<PandaNode>
-// Description : This class defines the extension methods for
-//               PandaNode, which are called instead of
-//               any C++ methods with the same prototype.
-////////////////////////////////////////////////////////////////////
+/**
+ * This class defines the extension methods for PandaNode, which are called
+ * instead of any C++ methods with the same prototype.
+ */
 template<>
 class Extension<PandaNode> : public ExtensionBase<PandaNode> {
 public:
@@ -37,12 +34,26 @@ public:
 
   PyObject *get_tag_keys() const;
 
-  void set_python_tag(const string &key, PyObject *value);
-  PyObject *get_python_tag(const string &key) const;
-  bool has_python_tag(const string &key) const;
-  void clear_python_tag(const string &key);
-  void get_python_tag_keys(vector_string &keys) const;
+  PyObject *get_python_tags();
+  int set_python_tag(PyObject *keys, PyObject *value);
+  PyObject *get_python_tag(PyObject *keys) const;
+  bool has_python_tag(PyObject *keys) const;
+  void clear_python_tag(PyObject *keys);
   PyObject *get_python_tag_keys() const;
+
+  // This is defined to implement cycle detection in Python tags.
+  int __traverse__(visitproc visit, void *arg);
+
+private:
+  // This is what actually stores the Python tags.
+  class PythonTagDataImpl : public PandaNode::PythonTagData {
+  public:
+    PythonTagDataImpl() : _dict(PyDict_New()) {};
+    PythonTagDataImpl(const PythonTagDataImpl &copy) : _dict(PyDict_Copy(copy._dict)) {};
+    virtual ~PythonTagDataImpl();
+
+    PyObject *_dict;
+  };
 };
 
 #endif  // HAVE_PYTHON

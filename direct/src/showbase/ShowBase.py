@@ -1,4 +1,6 @@
-"""Undocumented Module"""
+""" This module contains ShowBase, an application framework responsible
+for opening a graphical display, setting up input devices and creating
+the scene graph. """
 
 __all__ = ['ShowBase', 'WindowControls']
 
@@ -9,46 +11,44 @@ __all__ = ['ShowBase', 'WindowControls']
 
 from panda3d.core import *
 from panda3d.direct import get_config_showbase, throw_new_frame, init_app_for_gui
+from panda3d.direct import storeAccessibilityShortcutKeys, allowAccessibilityShortcutKeys
+
+# Register the extension methods for NodePath.
+from direct.extensions_native import NodePath_extensions
 
 # This needs to be available early for DirectGUI imports
-import __builtin__ as builtins
+import sys
+if sys.version_info >= (3, 0):
+    import builtins
+else:
+    import __builtin__ as builtins
 builtins.config = get_config_showbase()
 
 from direct.directnotify.DirectNotifyGlobal import directNotify, giveNotify
-from MessengerGlobal import messenger
-from BulletinBoardGlobal import bulletinBoard
+from .MessengerGlobal import messenger
+from .BulletinBoardGlobal import bulletinBoard
 from direct.task.TaskManagerGlobal import taskMgr
-from JobManagerGlobal import jobMgr
-from EventManagerGlobal import eventMgr
-from PythonUtil import *
-from direct.showbase import PythonUtil
-#from direct.interval.IntervalManager import ivalMgr
+from .JobManagerGlobal import jobMgr
+from .EventManagerGlobal import eventMgr
+#from PythonUtil import *
 from direct.interval import IntervalManager
-from InputStateGlobal import inputState
 from direct.showbase.BufferViewer import BufferViewer
 from direct.task import Task
-from direct.directutil import Verify
-from direct.showbase import GarbageReport
-import math,sys,os
-import Loader
+from . import Loader
 import time
-import gc
 import atexit
-from direct.fsm import ClassicFSM
-from direct.fsm import State
+import importlib
 from direct.showbase import ExceptionVarDump
-import DirectObject
-import SfxPlayer
+from . import DirectObject
+from . import SfxPlayer
 if __debug__:
+    from direct.showbase import GarbageReport
     from direct.directutil import DeltaProfiler
-import OnScreenDebug
-import AppRunnerGlobal
-
-builtins.FADE_SORT_INDEX = 1000
-builtins.NO_FADE_SORT_INDEX = 2000
+    from . import OnScreenDebug
+from . import AppRunnerGlobal
 
 def legacyRun():
-    builtins.base.notify.warning("run() is deprecated, use base.run() instead")
+    assert builtins.base.notify.warning("run() is deprecated, use base.run() instead")
     builtins.base.run()
 
 @atexit.register
@@ -61,33 +61,34 @@ def exitfunc():
 # *seem* to cause anyone any problems.
 class ShowBase(DirectObject.DirectObject):
 
+    config = get_config_showbase()
     notify = directNotify.newCategory("ShowBase")
 
     def __init__(self, fStartDirect = True, windowType = None):
-        self.__dev__ = config.GetBool('want-dev', __debug__)
+        self.__dev__ = self.config.GetBool('want-dev', __debug__)
         builtins.__dev__ = self.__dev__
 
-        logStackDump = (config.GetBool('log-stack-dump', False) or
-                        config.GetBool('client-log-stack-dump', False))
-        uploadStackDump = config.GetBool('upload-stack-dump', False)
+        logStackDump = (self.config.GetBool('log-stack-dump', False) or
+                        self.config.GetBool('client-log-stack-dump', False))
+        uploadStackDump = self.config.GetBool('upload-stack-dump', False)
         if logStackDump or uploadStackDump:
             ExceptionVarDump.install(logStackDump, uploadStackDump)
 
+        if __debug__:
+            self.__autoGarbageLogging = self.__dev__ and self.config.GetBool('auto-garbage-logging', False)
+
         ## The directory containing the main Python file of this application.
         self.mainDir = ExecutionEnvironment.getEnvironmentVariable("MAIN_DIR")
+        self.main_dir = self.mainDir
 
         ## This contains the global appRunner instance, as imported from
         ## AppRunnerGlobal.  This will be None if we are not running in the
         ## runtime environment (ie. from a .p3d file).
         self.appRunner = AppRunnerGlobal.appRunner
+        self.app_runner = self.appRunner
 
         #debug running multiplier
         self.debugRunningMultiplier = 4
-
-        # Get the dconfig object
-        self.config = config
-        # Setup wantVerifyPdb as soon as reasonable:
-        Verify.wantVerifyPdb = self.config.GetBool('want-verify-pdb', 0)
 
         # [gjeon] to disable sticky keys
         if self.config.GetBool('disable-sticky-keys', 0):
@@ -200,7 +201,9 @@ class ShowBase(DirectObject.DirectObject):
         ## This is used to store the wx.Application object used when want-wx is
         ## set or base.startWx() is called.
         self.wxApp = None
+        self.wxAppCreated = False
         self.tkRoot = None
+        self.tkRootCreated = False
 
         # This is used for syncing multiple PCs in a distributed cluster
         try:
@@ -214,6 +217,7 @@ class ShowBase(DirectObject.DirectObject):
 
         ## The global graphics engine, ie. GraphicsEngine.getGlobalPtr()
         self.graphicsEngine = GraphicsEngine.getGlobalPtr()
+        self.graphics_engine = self.graphicsEngine
         self.setupRender()
         self.setupRender2d()
         self.setupDataGraph()
@@ -257,6 +261,17 @@ class ShowBase(DirectObject.DirectObject):
             random.seed(seed)
             #whrandom.seed(seed & 0xff, (seed >> 8) & 0xff, (seed >> 16) & 0xff)
 
+        # For some reason, wx needs to be initialized before the graphics window
+        if sys.platform == "darwin":
+            if self.config.GetBool("want-wx", 0):
+                wx = importlib.import_module('wx')
+                self.wxApp = wx.App()
+
+            # Same goes for Tk, which uses a conflicting NSApplication
+            if self.config.GetBool("want-tk", 0):
+                Pmw = importlib.import_module('Pmw')
+                self.tkRoot = Pmw.initialise()
+
         # Open the default rendering window.
         if self.windowType != 'none':
             props = WindowProperties.getDefault()
@@ -282,6 +297,7 @@ class ShowBase(DirectObject.DirectObject):
         self.bboard = bulletinBoard
         ## The global task manager, as imported from TaskManagerGlobal.
         self.taskMgr = taskMgr
+        self.task_mgr = taskMgr
         ## The global job manager, as imported from JobManagerGlobal.
         self.jobMgr = jobMgr
 
@@ -294,7 +310,6 @@ class ShowBase(DirectObject.DirectObject):
         self.physicsMgrEnabled = 0
         self.physicsMgrAngular = 0
 
-        self.createBaseAudioManagers()
         self.createStats()
 
         self.AppHasAudioFocus = 1
@@ -327,7 +342,7 @@ class ShowBase(DirectObject.DirectObject):
             # assigned to a single CPU
             autoAffinity = self.config.GetBool('auto-single-cpu-affinity', 0)
             affinity = None
-            if autoAffinity and ('clientIndex' in builtins.__dict__):
+            if autoAffinity and hasattr(builtins, 'clientIndex'):
                 affinity = abs(int(builtins.clientIndex))
             else:
                 affinity = self.config.GetInt('client-cpu-affinity', -1)
@@ -338,8 +353,8 @@ class ShowBase(DirectObject.DirectObject):
                 TrueClock.getGlobalPtr().setCpuAffinity(1 << (affinity % 32))
 
         # Make sure we're not making more than one ShowBase.
-        if 'base' in builtins.__dict__:
-            raise StandardError, "Attempt to spawn multiple ShowBase instances!"
+        if hasattr(builtins, 'base'):
+            raise Exception("Attempt to spawn multiple ShowBase instances!")
 
         # DO NOT ADD TO THIS LIST.  We're trying to phase out the use of
         # built-in variables by ShowBase.  Use a Global module if necessary.
@@ -367,25 +382,25 @@ class ShowBase(DirectObject.DirectObject):
         builtins.cpMgr = ConfigPageManager.getGlobalPtr()
         builtins.cvMgr = ConfigVariableManager.getGlobalPtr()
         builtins.pandaSystem = PandaSystem.getGlobalPtr()
-        builtins.wantUberdog = base.config.GetBool('want-uberdog', 1)
+        builtins.wantUberdog = self.config.GetBool('want-uberdog', 1)
         if __debug__:
             builtins.deltaProfiler = DeltaProfiler.DeltaProfiler("ShowBase")
-        builtins.onScreenDebug = OnScreenDebug.OnScreenDebug()
+            self.onScreenDebug = OnScreenDebug.OnScreenDebug()
+            builtins.onScreenDebug = self.onScreenDebug
 
         if self.wantRender2dp:
             builtins.render2dp = self.render2dp
             builtins.aspect2dp = self.aspect2dp
             builtins.pixel2dp = self.pixel2dp
 
-        if __dev__:
-            ShowBase.notify.debug('__dev__ == %s' % __dev__)
+        if self.__dev__:
+            ShowBase.notify.debug('__dev__ == %s' % self.__dev__)
         else:
-            ShowBase.notify.info('__dev__ == %s' % __dev__)
+            ShowBase.notify.info('__dev__ == %s' % self.__dev__)
 
-        # set up recording of Functor creation stacks in __dev__
-        PythonUtil.recordFunctorCreationStacks()
+        self.createBaseAudioManagers()
 
-        if __dev__ or self.config.GetBool('want-e3-hacks', False):
+        if self.__dev__ or self.config.GetBool('want-e3-hacks', False):
             if self.config.GetBool('track-gui-items', True):
                 # dict of guiId to gui item, for tracking down leaks
                 self.guiItems = {}
@@ -403,7 +418,7 @@ class ShowBase(DirectObject.DirectObject):
         self.accept('window-event', self.windowEvent)
 
         # Transition effects (fade, iris, etc)
-        import Transitions
+        from . import Transitions
         self.transitions = Transitions.Transitions(self.loader)
 
         if self.win:
@@ -419,16 +434,17 @@ class ShowBase(DirectObject.DirectObject):
         # adds a sleep right after the main render in igloop
         # tends to even out the frame rate and keeps it from going
         # to zero in the out of focus windows
-        if base.config.GetBool('multi-sleep', 0):
+        if self.config.GetBool('multi-sleep', 0):
             self.multiClientSleep = 1
         else:
             self.multiClientSleep = 0
 
         # Offscreen buffer viewing utility.
         # This needs to be allocated even if the viewer is off.
-        self.bufferViewer = BufferViewer()
         if self.wantRender2dp:
-            self.bufferViewer.setRenderParent(self.render2dp)
+            self.bufferViewer = BufferViewer(self.win, self.render2dp)
+        else:
+            self.bufferViewer = BufferViewer(self.win, self.render2d)
 
         if self.windowType != 'none':
             if fStartDirect: # [gjeon] if this is False let them start direct manually
@@ -457,15 +473,16 @@ class ShowBase(DirectObject.DirectObject):
         some Panda config settings. """
 
         try:
-            import profile, pstats
+            profile = importlib.import_module('profile')
+            pstats = importlib.import_module('pstats')
         except ImportError:
             return
 
         profile.Profile.bias = float(self.config.GetString("profile-bias","0"))
 
         def f8(x):
-            return ("%"+"8.%df"%base.config.GetInt("profile-decimals",3)) % x
-        pstats.f8=f8
+            return ("%" + "8.%df" % self.config.GetInt("profile-decimals", 3)) % x
+        pstats.f8 = f8
 
     # temp; see ToonBase.py
     def getExitErrorCode(self):
@@ -477,12 +494,12 @@ class ShowBase(DirectObject.DirectObject):
         add stuff to this.
         """
         if self.config.GetBool('want-env-debug-info', 0):
-           print "\n\nEnvironment Debug Info {"
-           print "* model path:"
-           print getModelPath()
+           print("\n\nEnvironment Debug Info {")
+           print("* model path:")
+           print(getModelPath())
            #print "* dna path:"
            #print getDnaPath()
-           print "}"
+           print("}")
 
     def destroy(self):
         """ Call this function to destroy the ShowBase and stop all
@@ -531,15 +548,19 @@ class ShowBase(DirectObject.DirectObject):
             del self.winList
             del self.pipe
 
-        vfs = VirtualFileSystem.getGlobalPtr()
-        vfs.unmountAll()
-
-    def makeDefaultPipe(self, printPipeTypes = True):
+    def makeDefaultPipe(self, printPipeTypes = None):
         """
         Creates the default GraphicsPipe, which will be used to make
         windows unless otherwise specified.
         """
         assert self.pipe == None
+
+        if printPipeTypes is None:
+            # When the user didn't specify an explicit setting, take the value
+            # from the config variable. We could just omit the parameter, however
+            # this way we can keep backward compatibility.
+            printPipeTypes = ConfigVariableBool("print-pipe-types", True)
+
         selection = GraphicsPipeSelection.getGlobalPtr()
         if printPipeTypes:
             selection.printPipeTypes()
@@ -569,7 +590,6 @@ class ShowBase(DirectObject.DirectObject):
         Creates all GraphicsPipes that the system knows about and fill up
         self.pipeList with them.
         """
-        shouldPrintPipes = 0
         selection = GraphicsPipeSelection.getGlobalPtr()
         selection.loadAuxModules()
 
@@ -691,7 +711,7 @@ class ShowBase(DirectObject.DirectObject):
             if requireWindow:
                 # Unless require-window is set to false, it is an
                 # error not to open a window.
-                raise StandardError, 'Could not open window.'
+                raise Exception('Could not open window.')
         else:
             self.notify.info("Successfully opened window of type %s (%s)" % (
                 win.getType(), win.getPipe().getInterfaceName()))
@@ -807,7 +827,7 @@ class ShowBase(DirectObject.DirectObject):
         # Set up a 3-d camera for the window by default.
         if keepCamera:
             self.makeCamera(win, scene = scene, aspectRatio = aspectRatio,
-                            stereo = stereo, useCamera = base.cam)
+                            stereo = stereo, useCamera = self.cam)
         elif makeCamera:
             self.makeCamera(win, scene = scene, aspectRatio = aspectRatio,
                             stereo = stereo)
@@ -832,10 +852,10 @@ class ShowBase(DirectObject.DirectObject):
         for i in range(numRegions):
             dr = win.getDisplayRegion(i)
             # [gjeon] remove drc in base.direct.drList
-            if base.direct is not None:
-                for drc in base.direct.drList:
+            if self.direct is not None:
+                for drc in self.direct.drList:
                     if drc.cam == dr.getCamera():
-                        base.direct.drList.displayRegionList.remove(drc)
+                        self.direct.drList.displayRegionList.remove(drc)
                         break
 
             cam = NodePath(dr.getCamera())
@@ -888,7 +908,7 @@ class ShowBase(DirectObject.DirectObject):
         if not self.winList:
             # Give the window(s) a chance to actually close before we
             # continue.
-            base.graphicsEngine.renderFrame()
+            self.graphicsEngine.renderFrame()
 
     def openDefaultWindow(self, *args, **kw):
         # Creates the main window for the first time, without being
@@ -993,9 +1013,9 @@ class ShowBase(DirectObject.DirectObject):
         else:
             # Spawn it after igloop (at the end of each frame)
             self.taskMgr.remove('clientSleep')
-            self.taskMgr.add(self.sleepCycleTask, 'clientSleep', sort = 55)
+            self.taskMgr.add(self.__sleepCycleTask, 'clientSleep', sort = 55)
 
-    def sleepCycleTask(self, task):
+    def __sleepCycleTask(self, task):
         Thread.sleep(self.clientSleep)
         #time.sleep(self.clientSleep)
         return Task.cont
@@ -1642,22 +1662,26 @@ class ShowBase(DirectObject.DirectObject):
 
     def addAngularIntegrator(self):
         if not self.physicsMgrAngular:
+            physics = importlib.import_module('panda3d.physics')
             self.physicsMgrAngular = 1
-            integrator = AngularEulerIntegrator()
+            integrator = physics.AngularEulerIntegrator()
             self.physicsMgr.attachAngularIntegrator(integrator)
 
     def enableParticles(self):
         if not self.particleMgrEnabled:
+            # Use importlib to prevent this import from being picked up
+            # by modulefinder when packaging an application.
+
             if not self.particleMgr:
-                from direct.particles.ParticleManagerGlobal import particleMgr
-                self.particleMgr = particleMgr
+                PMG = importlib.import_module('direct.particles.ParticleManagerGlobal')
+                self.particleMgr = PMG.particleMgr
                 self.particleMgr.setFrameStepping(1)
 
             if not self.physicsMgr:
-                from PhysicsManagerGlobal import physicsMgr
-                from panda3d.physics import LinearEulerIntegrator
-                self.physicsMgr = physicsMgr
-                integrator = LinearEulerIntegrator()
+                PMG = importlib.import_module('direct.showbase.PhysicsManagerGlobal')
+                physics = importlib.import_module('panda3d.physics')
+                self.physicsMgr = PMG.physicsMgr
+                integrator = physics.LinearEulerIntegrator()
                 self.physicsMgr.attachLinearIntegrator(integrator)
 
             self.particleMgrEnabled = 1
@@ -1785,12 +1809,14 @@ class ShowBase(DirectObject.DirectObject):
     # backwards compatibility. Please do not add code here, add
     # it to the loader.
     def loadSfx(self, name):
+        assert self.notify.warning("base.loadSfx is deprecated, use base.loader.loadSfx instead.")
         return self.loader.loadSfx(name)
 
     # This function should only be in the loader but is here for
     # backwards compatibility. Please do not add code here, add
     # it to the loader.
     def loadMusic(self, name):
+        assert self.notify.warning("base.loadMusic is deprecated, use base.loader.loadMusic instead.")
         return self.loader.loadMusic(name)
 
     def playSfx(
@@ -1878,9 +1904,10 @@ class ShowBase(DirectObject.DirectObject):
         return Task.cont
 
     def __igLoop(self, state):
-        # We render the watch variables for the onScreenDebug as soon
-        # as we reasonably can before the renderFrame().
-        onScreenDebug.render()
+        if __debug__:
+            # We render the watch variables for the onScreenDebug as soon
+            # as we reasonably can before the renderFrame().
+            self.onScreenDebug.render()
 
         if self.recorder:
             self.recorder.recordFrame()
@@ -1892,9 +1919,10 @@ class ShowBase(DirectObject.DirectObject):
         if self.multiClientSleep:
             time.sleep(0)
 
-        # We clear the text buffer for the onScreenDebug as soon
-        # as we reasonably can after the renderFrame().
-        onScreenDebug.clear()
+        if __debug__:
+            # We clear the text buffer for the onScreenDebug as soon
+            # as we reasonably can after the renderFrame().
+            self.onScreenDebug.clear()
 
         if self.recorder:
             self.recorder.playFrame()
@@ -1917,13 +1945,13 @@ class ShowBase(DirectObject.DirectObject):
 
 
     def __igLoopSync(self, state):
-        # We render the watch variables for the onScreenDebug as soon
-        # as we reasonably can before the renderFrame().
-        onScreenDebug.render()
+        if __debug__:
+            # We render the watch variables for the onScreenDebug as soon
+            # as we reasonably can before the renderFrame().
+            self.onScreenDebug.render()
 
         if self.recorder:
             self.recorder.recordFrame()
-
 
         self.cluster.collectData()
 
@@ -1934,9 +1962,10 @@ class ShowBase(DirectObject.DirectObject):
         if self.multiClientSleep:
             time.sleep(0)
 
-        # We clear the text buffer for the onScreenDebug as soon
-        # as we reasonably can after the renderFrame().
-        onScreenDebug.clear()
+        if __debug__:
+            # We clear the text buffer for the onScreenDebug as soon
+            # as we reasonably can after the renderFrame().
+            self.onScreenDebug.clear()
 
         if self.recorder:
             self.recorder.playFrame()
@@ -2121,7 +2150,7 @@ class ShowBase(DirectObject.DirectObject):
         """
         if self.__deadInputs:
             self.eventMgr.doEvents()
-            self.dgTrav.traverse(base.dataRootNode)
+            self.dgTrav.traverse(self.dataRootNode)
             self.eventMgr.eventQueue.clear()
             self.taskMgr.add(self.__dataLoop, 'dataLoop', sort = -50)
             self.__deadInputs = 0
@@ -2171,8 +2200,10 @@ class ShowBase(DirectObject.DirectObject):
             self.texmem = None
             return
 
-        from direct.showutil.TexMemWatcher import TexMemWatcher
-        self.texmem = TexMemWatcher()
+        # Use importlib to prevent this import from being picked up
+        # by modulefinder when packaging an application.
+        TMW = importlib.import_module('direct.showutil.TexMemWatcher')
+        self.texmem = TMW.TexMemWatcher()
 
     def toggleShowVertices(self):
         """ Toggles a mode that visualizes vertex density per screen
@@ -2182,15 +2213,15 @@ class ShowBase(DirectObject.DirectObject):
             # Clean up the old mode.
             self.showVertices.node().setActive(0)
             dr = self.showVertices.node().getDisplayRegion(0)
-            base.win.removeDisplayRegion(dr)
+            self.win.removeDisplayRegion(dr)
             self.showVertices.removeNode()
             self.showVertices = None
             return
 
-        dr = base.win.makeDisplayRegion()
+        dr = self.win.makeDisplayRegion()
         dr.setSort(1000)
         cam = Camera('showVertices')
-        cam.setLens(base.camLens)
+        cam.setLens(self.camLens)
 
         # Set up a funny state to render only vertices.
         override = 100000
@@ -2381,7 +2412,7 @@ class ShowBase(DirectObject.DirectObject):
 
             # Tell the camera to cull from here instead of its own
             # origin.
-            for c in base.camList:
+            for c in self.camList:
                 c.node().setCullCenter(self.oobeCullFrustum)
             if cam.node().isOfType(Camera):
                 cam.node().setCullCenter(self.oobeCullFrustum)
@@ -2390,7 +2421,7 @@ class ShowBase(DirectObject.DirectObject):
         else:
             # Disable OOBE culling.
 
-            for c in base.camList:
+            for c in self.camList:
                 c.node().setCullCenter(NodePath())
             if cam.node().isOfType(Camera):
                 cam.node().setCullCenter(self.oobeCullFrustum)
@@ -2466,7 +2497,8 @@ class ShowBase(DirectObject.DirectObject):
     def saveCubeMap(self, namePrefix = 'cube_map_#.png',
                     defaultFilename = 0, source = None,
                     camera = None, size = 128,
-                    cameraMask = PandaNode.getAllCameraMask()):
+                    cameraMask = PandaNode.getAllCameraMask(),
+                    sourceLens = None):
 
         """
         Similar to screenshot(), this sets up a temporary cube map
@@ -2486,13 +2518,16 @@ class ShowBase(DirectObject.DirectObject):
         """
 
         if source == None:
-            source = base.win
+            source = self.win
 
         if camera == None:
             if hasattr(source, "getCamera"):
                 camera = source.getCamera()
             if camera == None:
-                camera = base.camera
+                camera = self.camera
+
+        if sourceLens == None:
+            sourceLens = self.camLens
 
         if hasattr(source, "getWindow"):
             source = source.getWindow()
@@ -2500,23 +2535,26 @@ class ShowBase(DirectObject.DirectObject):
         rig = NodePath(namePrefix)
         buffer = source.makeCubeMap(namePrefix, size, rig, cameraMask, 1)
         if buffer == None:
-            raise StandardError, "Could not make cube map."
+            raise Exception("Could not make cube map.")
 
         # Set the near and far planes from the default lens.
         lens = rig.find('**/+Camera').node().getLens()
-        lens.setNearFar(base.camLens.getNear(), base.camLens.getFar())
+
+        lens.setNearFar(sourceLens.getNear(), sourceLens.getFar())
 
         # Now render a frame to fill up the texture.
         rig.reparentTo(camera)
-        base.graphicsEngine.openWindows()
-        base.graphicsEngine.renderFrame()
+        self.graphicsEngine.openWindows()
+        self.graphicsEngine.renderFrame()
+        self.graphicsEngine.renderFrame()
+        self.graphicsEngine.syncFrame()
 
         tex = buffer.getTexture()
         saved = self.screenshot(namePrefix = namePrefix,
                                 defaultFilename = defaultFilename,
                                 source = tex)
 
-        base.graphicsEngine.removeWindow(buffer)
+        self.graphicsEngine.removeWindow(buffer)
         rig.removeNode()
 
         return saved
@@ -2525,7 +2563,7 @@ class ShowBase(DirectObject.DirectObject):
                       defaultFilename = 0, source = None,
                       camera = None, size = 256,
                       cameraMask = PandaNode.getAllCameraMask(),
-                      numVertices = 1000):
+                      numVertices = 1000, sourceLens = None):
         """
         This works much like saveCubeMap(), and uses the graphics
         API's hardware cube-mapping ability to get a 360-degree view
@@ -2542,13 +2580,16 @@ class ShowBase(DirectObject.DirectObject):
         there is a problem.
         """
         if source == None:
-            source = base.win
+            source = self.win
 
         if camera == None:
             if hasattr(source, "getCamera"):
                 camera = source.getCamera()
             if camera == None:
-                camera = base.camera
+                camera = self.camera
+
+        if sourceLens == None:
+            sourceLens = self.camLens
 
         if hasattr(source, "getWindow"):
             source = source.getWindow()
@@ -2563,12 +2604,12 @@ class ShowBase(DirectObject.DirectObject):
         rig = NodePath(namePrefix)
         buffer = toSphere.makeCubeMap(namePrefix, size, rig, cameraMask, 0)
         if buffer == None:
-            base.graphicsEngine.removeWindow(toSphere)
-            raise StandardError, "Could not make cube map."
+            self.graphicsEngine.removeWindow(toSphere)
+            raise Exception("Could not make cube map.")
 
         # Set the near and far planes from the default lens.
         lens = rig.find('**/+Camera').node().getLens()
-        lens.setNearFar(base.camLens.getNear(), base.camLens.getFar())
+        lens.setNearFar(sourceLens.getNear(), sourceLens.getFar())
 
         # Set up the scene to convert the cube map.  It's just a
         # simple scene, with only the FisheyeMaker object in it.
@@ -2592,18 +2633,19 @@ class ShowBase(DirectObject.DirectObject):
         # Now render a frame.  This will render out the cube map and
         # then apply it to the the card in the toSphere buffer.
         rig.reparentTo(camera)
-        base.graphicsEngine.openWindows()
-        base.graphicsEngine.renderFrame()
+        self.graphicsEngine.openWindows()
+        self.graphicsEngine.renderFrame()
 
         # One more frame for luck.
-        base.graphicsEngine.renderFrame()
+        self.graphicsEngine.renderFrame()
+        self.graphicsEngine.syncFrame()
 
         saved = self.screenshot(namePrefix = namePrefix,
                                 defaultFilename = defaultFilename,
                                 source = toSphere.getTexture())
 
-        base.graphicsEngine.removeWindow(buffer)
-        base.graphicsEngine.removeWindow(toSphere)
+        self.graphicsEngine.removeWindow(buffer)
+        self.graphicsEngine.removeWindow(toSphere)
         rig.removeNode()
 
         return saved
@@ -2657,16 +2699,18 @@ class ShowBase(DirectObject.DirectObject):
             if not properties.getOpen():
                 # If the user closes the main window, we should exit.
                 self.notify.info("User closed main window.")
-                if __dev__ and config.GetBool('auto-garbage-logging', 0):
-                    GarbageReport.b_checkForGarbageLeaks()
+                if __debug__:
+                    if self.__autoGarbageLogging:
+                        GarbageReport.b_checkForGarbageLeaks()
                 self.userExit()
 
             if properties.getForeground() and not self.mainWinForeground:
                 self.mainWinForeground = 1
             elif not properties.getForeground() and self.mainWinForeground:
                 self.mainWinForeground = 0
-                if __dev__ and config.GetBool('auto-garbage-logging', 0):
-                    GarbageReport.b_checkForGarbageLeaks()
+                if __debug__:
+                    if self.__autoGarbageLogging:
+                        GarbageReport.b_checkForGarbageLeaks()
 
             if properties.getMinimized() and not self.mainWinMinimized:
                 # If the main window is minimized, throw an event to
@@ -2790,15 +2834,19 @@ class ShowBase(DirectObject.DirectObject):
         updated, but wxPython owns the main loop (which seems to make
         it happier than the other way around). """
 
-        if self.wxApp:
+        if self.wxAppCreated:
             # Don't do this twice.
             return
 
         init_app_for_gui()
 
-        import wx
-        # Create a new base.wxApp.
-        self.wxApp = wx.PySimpleApp(redirect = False)
+        # Use importlib to prevent this import from being picked up
+        # by modulefinder when packaging an application.
+        wx = importlib.import_module('wx')
+
+        if not self.wxApp:
+            # Create a new base.wxApp.
+            self.wxApp = wx.PySimpleApp(redirect = False)
 
         if ConfigVariableBool('wx-main-loop', True):
             # Put wxPython in charge of the main loop.  It really
@@ -2824,15 +2872,16 @@ class ShowBase(DirectObject.DirectObject):
             def wxLoop(task):
                 # First we need to ensure that the OS message queue is
                 # processed.
-                base.wxApp.Yield()
+                self.wxApp.Yield()
 
                 # Now do all the wxPython events waiting on this frame.
-                while base.wxApp.Pending():
-                    base.wxApp.Dispatch()
+                while self.wxApp.Pending():
+                    self.wxApp.Dispatch()
 
                 return task.again
 
             self.taskMgr.add(wxLoop, 'wxLoop')
+        self.wxAppCreated = True
 
     def __wxTimerCallback(self, event):
         if Thread.getCurrentThread().getCurrentTask():
@@ -2867,15 +2916,18 @@ class ShowBase(DirectObject.DirectObject):
         updated, but Tkinter owns the main loop (which seems to make
         it happier than the other way around). """
 
-        if self.tkRoot:
+        if self.tkRootCreated:
             # Don't do this twice.
             return
 
-        from Tkinter import tkinter
-        import Pmw
+        # Use importlib to prevent this import from being picked up
+        # by modulefinder when packaging an application.
+        tkinter = importlib.import_module('_tkinter')
+        Pmw = importlib.import_module('Pmw')
 
         # Create a new Tk root.
-        self.tkRoot = Pmw.initialise()
+        if not self.tkRoot:
+            self.tkRoot = Pmw.initialise()
         builtins.tkroot = self.tkRoot
 
         init_app_for_gui()
@@ -2905,12 +2957,13 @@ class ShowBase(DirectObject.DirectObject):
                 # dooneevent will return 0 if there are no more events
                 # waiting or 1 if there are still more.
                 # DONT_WAIT tells tkinter not to block waiting for events
-                while tkinter.dooneevent(tkinter.ALL_EVENTS | tkinter.DONT_WAIT):
+                while self.tkRoot.dooneevent(tkinter.ALL_EVENTS | tkinter.DONT_WAIT):
                     pass
 
                 return task.again
 
             self.taskMgr.add(tkLoop, 'tkLoop')
+        self.tkRootCreated = True
 
     def __tkTimerCallback(self):
         if not Thread.getCurrentThread().getCurrentTask():
@@ -2935,8 +2988,12 @@ class ShowBase(DirectObject.DirectObject):
         self.startWx(fWantWx)
         self.wantDirect = fWantDirect
         if self.wantDirect:
-            from direct.directtools import DirectSession
-            base.direct.enable()
+            # Use importlib to prevent this import from being picked up
+            # by modulefinder when packaging an application.
+            DirectSession = importlib.import_module('direct.directtools.DirectSession')
+            self.direct = DirectSession.DirectSession()
+            self.direct.enable()
+            builtins.direct = self.direct
         else:
             builtins.direct = self.direct = None
 
@@ -2970,6 +3027,74 @@ class ShowBase(DirectObject.DirectObject):
         if self.appRunner is None or self.appRunner.dummy or \
            (self.appRunner.interactiveConsole and not self.appRunner.initialAppImport):
             self.taskMgr.run()
+
+
+    # Snake-case aliases, for people who prefer these.  We're in the process
+    # of migrating everyone to use the snake-case alternatives.
+    make_default_pipe = makeDefaultPipe
+    make_module_pipe = makeModulePipe
+    make_all_pipes = makeAllPipes
+    open_window = openWindow
+    close_window = closeWindow
+    open_default_window = openDefaultWindow
+    open_main_window = openMainWindow
+    set_sleep = setSleep
+    set_frame_rate_meter = setFrameRateMeter
+    set_scene_graph_analyzer_meter = setSceneGraphAnalyzerMeter
+    setup_window_controls = setupWindowControls
+    setup_render = setupRender
+    setup_render2d = setupRender2d
+    setup_render2dp = setupRender2dp
+    set_aspect_ratio = setAspectRatio
+    get_aspect_ratio = getAspectRatio
+    get_size = getSize
+    make_camera = makeCamera
+    make_camera2d = makeCamera2d
+    make_camera2dp = makeCamera2dp
+    setup_data_graph = setupDataGraph
+    setup_mouse = setupMouse
+    setup_mouse_cb = setupMouseCB
+    enable_software_mouse_pointer = enableSoftwareMousePointer
+    add_angular_integrator = addAngularIntegrator
+    enable_particles = enableParticles
+    disable_particles = disableParticles
+    toggle_particles = toggleParticles
+    create_stats = createStats
+    add_sfx_manager = addSfxManager
+    enable_music = enableMusic
+    enable_sound_effects = enableSoundEffects
+    disable_all_audio = disableAllAudio
+    enable_all_audio = enableAllAudio
+    init_shadow_trav = initShadowTrav
+    get_background_color = getBackgroundColor
+    set_background_color = setBackgroundColor
+    toggle_backface = toggleBackface
+    backface_culling_on = backfaceCullingOn
+    backface_culling_off = backfaceCullingOff
+    toggle_texture = toggleTexture
+    texture_on = textureOn
+    texture_off = textureOff
+    toggle_wireframe = toggleWireframe
+    wireframe_on = wireframeOn
+    wireframe_off = wireframeOff
+    disable_mouse = disableMouse
+    enable_mouse = enableMouse
+    silence_input = silenceInput
+    revive_input = reviveInput
+    set_mouse_on_node = setMouseOnNode
+    change_mouse_interface = changeMouseInterface
+    use_drive = useDrive
+    use_trackball = useTrackball
+    toggle_tex_mem = toggleTexMem
+    toggle_show_vertices = toggleShowVertices
+    oobe_cull = oobeCull
+    show_camera_frustum = showCameraFrustum
+    remove_camera_frustum = removeCameraFrustum
+    save_cube_map = saveCubeMap
+    save_sphere_map = saveSphereMap
+    start_wx = startWx
+    start_tk = startTk
+    start_direct = startDirect
 
 
 # A class to encapsulate information necessary for multiwindow support.

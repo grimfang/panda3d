@@ -1,16 +1,15 @@
-// Filename: dcKeywordList.h
-// Created by:  drose (25Jul05)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file dcKeywordList.h
+ * @author drose
+ * @date 2005-07-25
+ */
 
 #ifndef DCKEYWORDLIST_H
 #define DCKEYWORDLIST_H
@@ -20,12 +19,11 @@
 class DCKeyword;
 class HashGenerator;
 
-////////////////////////////////////////////////////////////////////
-//       Class : DCKeywordList
-// Description : This is a list of keywords (see DCKeyword) that may
-//               be set on a particular field.
-////////////////////////////////////////////////////////////////////
-class EXPCL_DIRECT DCKeywordList {
+/**
+ * This is a list of keywords (see DCKeyword) that may be set on a particular
+ * field.
+ */
+class DCKeywordList {
 public:
   DCKeywordList();
   DCKeywordList(const DCKeywordList &copy);

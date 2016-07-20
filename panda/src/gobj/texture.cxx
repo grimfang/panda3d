@@ -1,17 +1,17 @@
-// Filename: texture.cxx
-// Created by:  mike (09Jan97)
-// Updated by: fperazzi, PandaSE(29Apr10) (added TT_2d_texture_array)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file texture.cxx
+ * @author mike
+ * @date 1997-01-09
+ * @author fperazzi, PandaSE
+ * @date 2010-04-29
+ */
 
 #include "pandabase.h"
 #include "texture.h"
@@ -66,11 +66,11 @@ AutoTextureScale Texture::_textures_power_2 = ATS_unspecified;
 
 // Stuff to read and write DDS files.
 
-//  little-endian, of course
+// little-endian, of course
 #define DDS_MAGIC 0x20534444
 
 
-//  DDS_header.dwFlags
+// DDS_header.dwFlags
 #define DDSD_CAPS                   0x00000001
 #define DDSD_HEIGHT                 0x00000002
 #define DDSD_WIDTH                  0x00000004
@@ -80,18 +80,18 @@ AutoTextureScale Texture::_textures_power_2 = ATS_unspecified;
 #define DDSD_LINEARSIZE             0x00080000
 #define DDSD_DEPTH                  0x00800000
 
-//  DDS_header.sPixelFormat.dwFlags
+// DDS_header.sPixelFormat.dwFlags
 #define DDPF_ALPHAPIXELS            0x00000001
 #define DDPF_FOURCC                 0x00000004
 #define DDPF_INDEXED                0x00000020
 #define DDPF_RGB                    0x00000040
 
-//  DDS_header.sCaps.dwCaps1
+// DDS_header.sCaps.dwCaps1
 #define DDSCAPS_COMPLEX             0x00000008
 #define DDSCAPS_TEXTURE             0x00001000
 #define DDSCAPS_MIPMAP              0x00400000
 
-//  DDS_header.sCaps.dwCaps2
+// DDS_header.sCaps.dwCaps2
 #define DDSCAPS2_CUBEMAP            0x00000200
 #define DDSCAPS2_CUBEMAP_POSITIVEX  0x00000400
 #define DDSCAPS2_CUBEMAP_NEGATIVEX  0x00000800
@@ -132,14 +132,236 @@ struct DDSHeader {
   DDSCaps2 caps;
 };
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::Constructor
-//       Access: Published
-//  Description: Constructs an empty texture.  The default is to set
-//               up the texture as an empty 2-d texture; follow up
-//               with one of the variants of setup_texture() if this
-//               is not what you want.
-////////////////////////////////////////////////////////////////////
+// Stuff to read KTX files.
+enum KTXType {
+  KTX_BYTE = 0x1400,
+  KTX_UNSIGNED_BYTE = 0x1401,
+  KTX_SHORT = 0x1402,
+  KTX_UNSIGNED_SHORT = 0x1403,
+  KTX_INT = 0x1404,
+  KTX_UNSIGNED_INT = 0x1405,
+  KTX_FLOAT = 0x1406,
+  KTX_HALF_FLOAT = 0x140B,
+  KTX_UNSIGNED_BYTE_3_3_2 = 0x8032,
+  KTX_UNSIGNED_SHORT_4_4_4_4 = 0x8033,
+  KTX_UNSIGNED_SHORT_5_5_5_1 = 0x8034,
+  KTX_UNSIGNED_INT_8_8_8_8 = 0x8035,
+  KTX_UNSIGNED_INT_10_10_10_2 = 0x8036,
+  KTX_UNSIGNED_BYTE_2_3_3_REV = 0x8362,
+  KTX_UNSIGNED_SHORT_5_6_5 = 0x8363,
+  KTX_UNSIGNED_SHORT_5_6_5_REV = 0x8364,
+  KTX_UNSIGNED_SHORT_4_4_4_4_REV = 0x8365,
+  KTX_UNSIGNED_SHORT_1_5_5_5_REV = 0x8366,
+  KTX_UNSIGNED_INT_8_8_8_8_REV = 0x8367,
+  KTX_UNSIGNED_INT_2_10_10_10_REV = 0x8368,
+  KTX_UNSIGNED_INT_24_8 = 0x84FA,
+  KTX_UNSIGNED_INT_10F_11F_11F_REV = 0x8C3B,
+  KTX_UNSIGNED_INT_5_9_9_9_REV = 0x8C3E,
+  KTX_FLOAT_32_UNSIGNED_INT_24_8_REV = 0x8DAD,
+};
+
+enum KTXFormat {
+  KTX_ALPHA = 0x1906,
+  KTX_ALPHA12 = 0x803D,
+  KTX_ALPHA16 = 0x803E,
+  KTX_ALPHA16_SNORM = 0x9018,
+  KTX_ALPHA4 = 0x803B,
+  KTX_ALPHA8 = 0x803C,
+  KTX_ALPHA8_SNORM = 0x9014,
+  KTX_ALPHA_SNORM = 0x9010,
+  KTX_BGR = 0x80E0,
+  KTX_BGR_INTEGER = 0x8D9A,
+  KTX_BGRA = 0x80E1,
+  KTX_BGRA_INTEGER = 0x8D9B,
+  KTX_BLUE = 0x1905,
+  KTX_BLUE_INTEGER = 0x8D96,
+  KTX_COLOR_INDEX = 0x1900,
+  KTX_DEPTH24_STENCIL8 = 0x88F0,
+  KTX_DEPTH32F_STENCIL8 = 0x8CAD,
+  KTX_DEPTH_COMPONENT = 0x1902,
+  KTX_DEPTH_COMPONENT16 = 0x81A5,
+  KTX_DEPTH_COMPONENT24 = 0x81A6,
+  KTX_DEPTH_COMPONENT32 = 0x81A7,
+  KTX_DEPTH_COMPONENT32F = 0x8CAC,
+  KTX_DEPTH_STENCIL = 0x84F9,
+  KTX_GREEN = 0x1904,
+  KTX_GREEN_INTEGER = 0x8D95,
+  KTX_INTENSITY = 0x8049,
+  KTX_INTENSITY12 = 0x804C,
+  KTX_INTENSITY16 = 0x804D,
+  KTX_INTENSITY16_SNORM = 0x901B,
+  KTX_INTENSITY4 = 0x804A,
+  KTX_INTENSITY8 = 0x804B,
+  KTX_INTENSITY8_SNORM = 0x9017,
+  KTX_INTENSITY_SNORM = 0x9013,
+  KTX_LUMINANCE = 0x1909,
+  KTX_LUMINANCE12 = 0x8041,
+  KTX_LUMINANCE12_ALPHA12 = 0x8047,
+  KTX_LUMINANCE12_ALPHA4 = 0x8046,
+  KTX_LUMINANCE16 = 0x8042,
+  KTX_LUMINANCE16_ALPHA16 = 0x8048,
+  KTX_LUMINANCE16_ALPHA16_SNORM = 0x901A,
+  KTX_LUMINANCE16_SNORM = 0x9019,
+  KTX_LUMINANCE4 = 0x803F,
+  KTX_LUMINANCE4_ALPHA4 = 0x8043,
+  KTX_LUMINANCE6_ALPHA2 = 0x8044,
+  KTX_LUMINANCE8 = 0x8040,
+  KTX_LUMINANCE8_ALPHA8 = 0x8045,
+  KTX_LUMINANCE8_ALPHA8_SNORM = 0x9016,
+  KTX_LUMINANCE8_SNORM = 0x9015,
+  KTX_LUMINANCE_ALPHA = 0x190A,
+  KTX_LUMINANCE_ALPHA_SNORM = 0x9012,
+  KTX_LUMINANCE_SNORM = 0x9011,
+  KTX_R11F_G11F_B10F = 0x8C3A,
+  KTX_R16 = 0x822A,
+  KTX_R16_SNORM = 0x8F98,
+  KTX_R16F = 0x822D,
+  KTX_R16I = 0x8233,
+  KTX_R16UI = 0x8234,
+  KTX_R32F = 0x822E,
+  KTX_R32I = 0x8235,
+  KTX_R32UI = 0x8236,
+  KTX_R3_G3_B2 = 0x2A10,
+  KTX_R8 = 0x8229,
+  KTX_R8_SNORM = 0x8F94,
+  KTX_R8I = 0x8231,
+  KTX_R8UI = 0x8232,
+  KTX_RED = 0x1903,
+  KTX_RED_INTEGER = 0x8D94,
+  KTX_RED_SNORM = 0x8F90,
+  KTX_RG = 0x8227,
+  KTX_RG16 = 0x822C,
+  KTX_RG16_SNORM = 0x8F99,
+  KTX_RG16F = 0x822F,
+  KTX_RG16I = 0x8239,
+  KTX_RG16UI = 0x823A,
+  KTX_RG32F = 0x8230,
+  KTX_RG32I = 0x823B,
+  KTX_RG32UI = 0x823C,
+  KTX_RG8 = 0x822B,
+  KTX_RG8_SNORM = 0x8F95,
+  KTX_RG8I = 0x8237,
+  KTX_RG8UI = 0x8238,
+  KTX_RG_INTEGER = 0x8228,
+  KTX_RG_SNORM = 0x8F91,
+  KTX_RGB = 0x1907,
+  KTX_RGB10 = 0x8052,
+  KTX_RGB10_A2 = 0x8059,
+  KTX_RGB12 = 0x8053,
+  KTX_RGB16 = 0x8054,
+  KTX_RGB16_SNORM = 0x8F9A,
+  KTX_RGB16F = 0x881B,
+  KTX_RGB16I = 0x8D89,
+  KTX_RGB16UI = 0x8D77,
+  KTX_RGB2 = 0x804E,
+  KTX_RGB32F = 0x8815,
+  KTX_RGB32I = 0x8D83,
+  KTX_RGB32UI = 0x8D71,
+  KTX_RGB4 = 0x804F,
+  KTX_RGB5 = 0x8050,
+  KTX_RGB5_A1 = 0x8057,
+  KTX_RGB8 = 0x8051,
+  KTX_RGB8_SNORM = 0x8F96,
+  KTX_RGB8I = 0x8D8F,
+  KTX_RGB8UI = 0x8D7D,
+  KTX_RGB9_E5 = 0x8C3D,
+  KTX_RGB_INTEGER = 0x8D98,
+  KTX_RGB_SNORM = 0x8F92,
+  KTX_RGBA = 0x1908,
+  KTX_RGBA12 = 0x805A,
+  KTX_RGBA16 = 0x805B,
+  KTX_RGBA16_SNORM = 0x8F9B,
+  KTX_RGBA16F = 0x881A,
+  KTX_RGBA16I = 0x8D88,
+  KTX_RGBA16UI = 0x8D76,
+  KTX_RGBA2 = 0x8055,
+  KTX_RGBA32F = 0x8814,
+  KTX_RGBA32I = 0x8D82,
+  KTX_RGBA32UI = 0x8D70,
+  KTX_RGBA4 = 0x8056,
+  KTX_RGBA8 = 0x8058,
+  KTX_RGBA8_SNORM = 0x8F97,
+  KTX_RGBA8I = 0x8D8E,
+  KTX_RGBA8UI = 0x8D7C,
+  KTX_RGBA_INTEGER = 0x8D99,
+  KTX_RGBA_SNORM = 0x8F93,
+  KTX_SLUMINANCE = 0x8C46,
+  KTX_SLUMINANCE8 = 0x8C47,
+  KTX_SLUMINANCE8_ALPHA8 = 0x8C45,
+  KTX_SLUMINANCE_ALPHA = 0x8C44,
+  KTX_SRGB = 0x8C40,
+  KTX_SRGB8 = 0x8C41,
+  KTX_SRGB8_ALPHA8 = 0x8C43,
+  KTX_SRGB_ALPHA = 0x8C42,
+  KTX_STENCIL_INDEX = 0x1901,
+  KTX_STENCIL_INDEX1 = 0x8D46,
+  KTX_STENCIL_INDEX16 = 0x8D49,
+  KTX_STENCIL_INDEX4 = 0x8D47,
+  KTX_STENCIL_INDEX8 = 0x8D48,
+};
+
+enum KTXCompressedFormat {
+  KTX_COMPRESSED_LUMINANCE_ALPHA_LATC2 = 0x8C72,
+  KTX_COMPRESSED_LUMINANCE_LATC1 = 0x8C70,
+  KTX_COMPRESSED_R11_EAC = 0x9270,
+  KTX_COMPRESSED_RED = 0x8225,
+  KTX_COMPRESSED_RED_RGTC1 = 0x8DBB,
+  KTX_COMPRESSED_RG = 0x8226,
+  KTX_COMPRESSED_RG11_EAC = 0x9272,
+  KTX_COMPRESSED_RG_RGTC2 = 0x8DBD,
+  KTX_COMPRESSED_RGB = 0x84ED,
+  KTX_COMPRESSED_RGB8_ETC2 = 0x9274,
+  KTX_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 = 0x9276,
+  KTX_COMPRESSED_RGB_BPTC_SIGNED_FLOAT = 0x8E8E,
+  KTX_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT = 0x8E8F,
+  KTX_COMPRESSED_RGB_FXT1_3DFX = 0x86B0,
+  KTX_COMPRESSED_RGB_PVRTC_2BPPV1_IMG = 0x8C01,
+  KTX_COMPRESSED_RGB_PVRTC_4BPPV1_IMG = 0x8C00,
+  KTX_COMPRESSED_RGB_S3TC_DXT1 = 0x83F0,
+  KTX_COMPRESSED_RGBA = 0x84EE,
+  KTX_COMPRESSED_RGBA8_ETC2_EAC = 0x9278,
+  KTX_COMPRESSED_RGBA_BPTC_UNORM = 0x8E8C,
+  KTX_COMPRESSED_RGBA_FXT1_3DFX = 0x86B1,
+  KTX_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG = 0x8C03,
+  KTX_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG = 0x9137,
+  KTX_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG = 0x8C02,
+  KTX_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG = 0x9138,
+  KTX_COMPRESSED_RGBA_S3TC_DXT1 = 0x83F1,
+  KTX_COMPRESSED_RGBA_S3TC_DXT3 = 0x83F2,
+  KTX_COMPRESSED_RGBA_S3TC_DXT5 = 0x83F3,
+  KTX_COMPRESSED_SIGNED_LUMINANCE_ALPHA_LATC2 = 0x8C73,
+  KTX_COMPRESSED_SIGNED_LUMINANCE_LATC1 = 0x8C71,
+  KTX_COMPRESSED_SIGNED_R11_EAC = 0x9271,
+  KTX_COMPRESSED_SIGNED_RED_RGTC1 = 0x8DBC,
+  KTX_COMPRESSED_SIGNED_RG11_EAC = 0x9273,
+  KTX_COMPRESSED_SIGNED_RG_RGTC2 = 0x8DBE,
+  KTX_COMPRESSED_SLUMINANCE = 0x8C4A,
+  KTX_COMPRESSED_SLUMINANCE_ALPHA = 0x8C4B,
+  KTX_COMPRESSED_SRGB = 0x8C48,
+  KTX_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC = 0x9279,
+  KTX_COMPRESSED_SRGB8_ETC2 = 0x9275,
+  KTX_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2 = 0x9277,
+  KTX_COMPRESSED_SRGB_ALPHA = 0x8C49,
+  KTX_COMPRESSED_SRGB_ALPHA_BPTC_UNORM = 0x8E8D,
+  KTX_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV1 = 0x8A56,
+  KTX_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV2 = 0x93F0,
+  KTX_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1 = 0x8A57,
+  KTX_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV2 = 0x93F1,
+  KTX_COMPRESSED_SRGB_ALPHA_S3TC_DXT1 = 0x8C4D,
+  KTX_COMPRESSED_SRGB_ALPHA_S3TC_DXT3 = 0x8C4E,
+  KTX_COMPRESSED_SRGB_ALPHA_S3TC_DXT5 = 0x8C4F,
+  KTX_COMPRESSED_SRGB_PVRTC_2BPPV1 = 0x8A54,
+  KTX_COMPRESSED_SRGB_PVRTC_4BPPV1 = 0x8A55,
+  KTX_COMPRESSED_SRGB_S3TC_DXT1 = 0x8C4C,
+  KTX_ETC1_RGB8 = 0x8D64,
+  KTX_ETC1_SRGB8 = 0x88EE,
+};
+
+/**
+ * Constructs an empty texture.  The default is to set up the texture as an
+ * empty 2-d texture; follow up with one of the variants of setup_texture() if
+ * this is not what you want.
+ */
 Texture::
 Texture(const string &name) :
   Namable(name),
@@ -153,12 +375,9 @@ Texture(const string &name) :
   do_set_component_type(cdata, T_unsigned_byte);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::Copy Constructor
-//       Access: Protected
-//  Description: Use Texture::make_copy() to make a duplicate copy of
-//               an existing Texture.
-////////////////////////////////////////////////////////////////////
+/**
+ * Use Texture::make_copy() to make a duplicate copy of an existing Texture.
+ */
 Texture::
 Texture(const Texture &copy) :
   Namable(copy),
@@ -169,39 +388,30 @@ Texture(const Texture &copy) :
   _reloading = false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::Copy Assignment Operator
-//       Access: Protected
-//  Description: Use Texture::make_copy() to make a duplicate copy of
-//               an existing Texture.
-////////////////////////////////////////////////////////////////////
+/**
+ * Use Texture::make_copy() to make a duplicate copy of an existing Texture.
+ */
 void Texture::
 operator = (const Texture &copy) {
   Namable::operator = (copy);
   _cycler = copy._cycler;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::Destructor
-//       Access: Published, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 Texture::
 ~Texture() {
   release_all();
   nassertv(!_reloading);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::generate_normalization_cube_map
-//       Access: Published
-//  Description: Generates a special cube map image in the texture
-//               that can be used to apply bump mapping effects: for
-//               each texel in the cube map that is indexed by the 3-d
-//               texture coordinates (x, y, z), the resulting value is
-//               the normalized vector (x, y, z) (compressed from
-//               -1..1 into 0..1).
-////////////////////////////////////////////////////////////////////
+/**
+ * Generates a special cube map image in the texture that can be used to apply
+ * bump mapping effects: for each texel in the cube map that is indexed by the
+ * 3-d texture coordinates (x, y, z), the resulting value is the normalized
+ * vector (x, y, z) (compressed from -1..1 into 0..1).
+ */
 void Texture::
 generate_normalization_cube_map(int size) {
   CDWriter cdata(_cycler, true);
@@ -298,15 +508,12 @@ generate_normalization_cube_map(int size) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::generate_alpha_scale_map
-//       Access: Published
-//  Description: Generates a special 256x1 1-d texture that can be
-//               used to apply an arbitrary alpha scale to objects by
-//               judicious use of texture matrix.  The texture is a
-//               gradient, with an alpha of 0 on the left (U = 0), and
-//               255 on the right (U = 1).
-////////////////////////////////////////////////////////////////////
+/**
+ * Generates a special 256x1 1-d texture that can be used to apply an
+ * arbitrary alpha scale to objects by judicious use of texture matrix.  The
+ * texture is a gradient, with an alpha of 0 on the left (U = 0), and 255 on
+ * the right (U = 1).
+ */
 void Texture::
 generate_alpha_scale_map() {
   CDWriter cdata(_cycler, true);
@@ -329,11 +536,9 @@ generate_alpha_scale_map() {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read
-//       Access: Published
-//  Description: Reads the named filename into the texture.
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads the named filename into the texture.
+ */
 bool Texture::
 read(const Filename &fullpath, const LoaderOptions &options) {
   CDWriter cdata(_cycler, true);
@@ -344,17 +549,13 @@ read(const Filename &fullpath, const LoaderOptions &options) {
                  options, NULL);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read
-//       Access: Published
-//  Description: Combine a 3-component image with a grayscale image
-//               to get a 4-component image.
-//
-//               See the description of the full-parameter read()
-//               method for the meaning of the
-//               primary_file_num_channels and alpha_file_channel
-//               parameters.
-////////////////////////////////////////////////////////////////////
+/**
+ * Combine a 3-component image with a grayscale image to get a 4-component
+ * image.
+ *
+ * See the description of the full-parameter read() method for the meaning of
+ * the primary_file_num_channels and alpha_file_channel parameters.
+ */
 bool Texture::
 read(const Filename &fullpath, const Filename &alpha_fullpath,
      int primary_file_num_channels, int alpha_file_channel,
@@ -368,16 +569,13 @@ read(const Filename &fullpath, const Filename &alpha_fullpath,
                  options, NULL);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read
-//       Access: Published
-//  Description: Reads a single file into a single page or mipmap
-//               level, or automatically reads a series of files into
-//               a series of pages and/or mipmap levels.
-//
-//               See the description of the full-parameter read()
-//               method for the meaning of the various parameters.
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads a single file into a single page or mipmap level, or automatically
+ * reads a series of files into a series of pages and/or mipmap levels.
+ *
+ * See the description of the full-parameter read() method for the meaning of
+ * the various parameters.
+ */
 bool Texture::
 read(const Filename &fullpath, int z, int n,
      bool read_pages, bool read_mipmaps,
@@ -389,75 +587,58 @@ read(const Filename &fullpath, int z, int n,
                  options, NULL);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read
-//       Access: Published
-//  Description: Reads the texture from the indicated filename.  If
-//               primary_file_num_channels is not 0, it specifies the
-//               number of components to downgrade the image to if it
-//               is greater than this number.
-//
-//               If the filename has the extension .txo, this
-//               implicitly reads a texture object instead of a
-//               filename (which replaces all of the texture
-//               properties).  In this case, all the rest of the
-//               parameters are ignored, and the filename should not
-//               contain any hash marks; just the one named file will
-//               be read, since a single .txo file can contain all
-//               pages and mipmaps necessary to define a texture.
-//
-//               If alpha_fullpath is not empty, it specifies the name
-//               of a file from which to retrieve the alpha.  In this
-//               case, alpha_file_channel represents the numeric
-//               channel of this image file to use as the resulting
-//               texture's alpha channel; usually, this is 0 to
-//               indicate the grayscale combination of r, g, b; or it
-//               may be a one-based channel number, e.g. 1 for the red
-//               channel, 2 for the green channel, and so on.
-//
-//               If read pages is false, then z indicates the page
-//               number into which this image will be assigned.
-//               Normally this is 0 for the first (or only) page of
-//               the texture.  3-D textures have one page for each
-//               level of depth, and cube map textures always have six
-//               pages.
-//
-//               If read_pages is true, multiple images will be read
-//               at once, one for each page of a cube map or a 3-D
-//               texture.  In this case, the filename should contain a
-//               sequence of one or more hash marks ("#") which will
-//               be filled in with the z value of each page,
-//               zero-based.  In this case, the z parameter indicates
-//               the maximum z value that will be loaded, or 0 to load
-//               all filenames that exist.
-//
-//               If read_mipmaps is false, then n indicates the mipmap
-//               level to which this image will be assigned.  Normally
-//               this is 0 for the base texture image, but it is
-//               possible to load custom mipmap levels into the later
-//               images.  After the base texture image is loaded (thus
-//               defining the size of the texture), you can call
-//               get_expected_num_mipmap_levels() to determine the
-//               maximum sensible value for n.
-//
-//               If read_mipmaps is true, multiple images will be read
-//               as above, but this time the images represent the
-//               different mipmap levels of the texture image.  In
-//               this case, the n parameter indicates the maximum n
-//               value that will be loaded, or 0 to load all filenames
-//               that exist (up to the expected number of mipmap
-//               levels).
-//
-//               If both read_pages and read_mipmaps is true, then
-//               both sequences will be read; the filename should
-//               contain two sequences of hash marks, separated by
-//               some character such as a hyphen, underscore, or dot.
-//               The first hash mark sequence will be filled in with
-//               the mipmap level, while the second hash mark sequence
-//               will be the page index.
-//
-//               This method implicitly sets keep_ram_image to false.
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads the texture from the indicated filename.  If
+ * primary_file_num_channels is not 0, it specifies the number of components
+ * to downgrade the image to if it is greater than this number.
+ *
+ * If the filename has the extension .txo, this implicitly reads a texture
+ * object instead of a filename (which replaces all of the texture
+ * properties).  In this case, all the rest of the parameters are ignored, and
+ * the filename should not contain any hash marks; just the one named file
+ * will be read, since a single .txo file can contain all pages and mipmaps
+ * necessary to define a texture.
+ *
+ * If alpha_fullpath is not empty, it specifies the name of a file from which
+ * to retrieve the alpha.  In this case, alpha_file_channel represents the
+ * numeric channel of this image file to use as the resulting texture's alpha
+ * channel; usually, this is 0 to indicate the grayscale combination of r, g,
+ * b; or it may be a one-based channel number, e.g.  1 for the red channel, 2
+ * for the green channel, and so on.
+ *
+ * If read pages is false, then z indicates the page number into which this
+ * image will be assigned.  Normally this is 0 for the first (or only) page of
+ * the texture.  3-D textures have one page for each level of depth, and cube
+ * map textures always have six pages.
+ *
+ * If read_pages is true, multiple images will be read at once, one for each
+ * page of a cube map or a 3-D texture.  In this case, the filename should
+ * contain a sequence of one or more hash marks ("#") which will be filled in
+ * with the z value of each page, zero-based.  In this case, the z parameter
+ * indicates the maximum z value that will be loaded, or 0 to load all
+ * filenames that exist.
+ *
+ * If read_mipmaps is false, then n indicates the mipmap level to which this
+ * image will be assigned.  Normally this is 0 for the base texture image, but
+ * it is possible to load custom mipmap levels into the later images.  After
+ * the base texture image is loaded (thus defining the size of the texture),
+ * you can call get_expected_num_mipmap_levels() to determine the maximum
+ * sensible value for n.
+ *
+ * If read_mipmaps is true, multiple images will be read as above, but this
+ * time the images represent the different mipmap levels of the texture image.
+ * In this case, the n parameter indicates the maximum n value that will be
+ * loaded, or 0 to load all filenames that exist (up to the expected number of
+ * mipmap levels).
+ *
+ * If both read_pages and read_mipmaps is true, then both sequences will be
+ * read; the filename should contain two sequences of hash marks, separated by
+ * some character such as a hyphen, underscore, or dot.  The first hash mark
+ * sequence will be filled in with the mipmap level, while the second hash
+ * mark sequence will be the page index.
+ *
+ * This method implicitly sets keep_ram_image to false.
+ */
 bool Texture::
 read(const Filename &fullpath, const Filename &alpha_fullpath,
      int primary_file_num_channels, int alpha_file_channel,
@@ -472,24 +653,20 @@ read(const Filename &fullpath, const Filename &alpha_fullpath,
                  options, record);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::estimate_texture_memory
-//       Access: Published
-//  Description: Estimates the amount of texture memory that will be
-//               consumed by loading this texture.  This returns a
-//               value that is not specific to any particular graphics
-//               card or driver; it tries to make a reasonable
-//               assumption about how a driver will load the texture.
-//               It does not account for texture compression or
-//               anything fancy.  This is mainly useful for debugging
-//               and reporting purposes.
-//
-//               Returns a value in bytes.
-////////////////////////////////////////////////////////////////////
+/**
+ * Estimates the amount of texture memory that will be consumed by loading
+ * this texture.  This returns a value that is not specific to any particular
+ * graphics card or driver; it tries to make a reasonable assumption about how
+ * a driver will load the texture.  It does not account for texture
+ * compression or anything fancy.  This is mainly useful for debugging and
+ * reporting purposes.
+ *
+ * Returns a value in bytes.
+ */
 size_t Texture::
 estimate_texture_memory() const {
   CDReader cdata(_cycler);
-  size_t pixels = cdata->_x_size * cdata->_y_size;
+  size_t pixels = cdata->_x_size * cdata->_y_size * cdata->_z_size;
 
   size_t bpp = 4;
   switch (cdata->_format) {
@@ -502,20 +679,27 @@ estimate_texture_memory() const {
   case Texture::F_green:
   case Texture::F_blue:
   case Texture::F_luminance:
+  case Texture::F_sluminance:
+  case Texture::F_r8i:
+    bpp = 1;
+    break;
+
   case Texture::F_luminance_alpha:
   case Texture::F_luminance_alphamask:
-  case Texture::F_sluminance:
   case Texture::F_sluminance_alpha:
-    bpp = 4;
+  case Texture::F_rgba4:
+  case Texture::F_rgb5:
+  case Texture::F_rgba5:
+  case Texture::F_rg:
+    bpp = 2;
     break;
 
   case Texture::F_rgba:
-  case Texture::F_rgba4:
   case Texture::F_rgbm:
   case Texture::F_rgb:
-  case Texture::F_rgb5:
-  case Texture::F_rgba5:
   case Texture::F_srgb:
+    // Most of the above formats have only 3 bytes, but they are most likely
+    // to get padded by the driver
     bpp = 4;
     break;
 
@@ -529,13 +713,22 @@ estimate_texture_memory() const {
     break;
 
   case Texture::F_depth_stencil:
+    bpp = 4;
+    break;
+
   case Texture::F_depth_component:
-    bpp = 32;
+  case Texture::F_depth_component16:
+    bpp = 2;
+    break;
+
+  case Texture::F_depth_component24: // Gets padded
+  case Texture::F_depth_component32:
+    bpp = 4;
     break;
 
   case Texture::F_rgba12:
   case Texture::F_rgb12:
-    bpp = 6;
+    bpp = 8;
     break;
 
   case Texture::F_rgba16:
@@ -546,7 +739,7 @@ estimate_texture_memory() const {
     break;
 
   case Texture::F_r16:
-  case Texture::F_r8i:
+  case Texture::F_r16i:
   case Texture::F_rg8i:
     bpp = 2;
     break;
@@ -554,24 +747,31 @@ estimate_texture_memory() const {
     bpp = 4;
     break;
   case Texture::F_rgb16:
-    bpp = 6;
+    bpp = 8;
     break;
 
   case Texture::F_r32i:
-    bpp = 4;
-    break;
-
   case Texture::F_r32:
     bpp = 4;
     break;
+
   case Texture::F_rg32:
     bpp = 8;
     break;
+
   case Texture::F_rgb32:
-    bpp = 12;
+    bpp = 16;
+    break;
+
+  case Texture::F_r11_g11_b10:
+  case Texture::F_rgb9_e5:
+  case Texture::F_rgb10_a2:
+    bpp = 4;
     break;
 
   default:
+    gobj_cat.warning() << "Unhandled format in estimate_texture_memory(): "
+                       << cdata->_format << "\n";
     break;
   }
 
@@ -583,42 +783,32 @@ estimate_texture_memory() const {
   return bytes;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::set_aux_data
-//       Access: Published
-//  Description: Records an arbitrary object in the Texture,
-//               associated with a specified key.  The object may
-//               later be retrieved by calling get_aux_data() with the
-//               same key.
-//
-//               These data objects are not recorded to a bam or txo
-//               file.
-////////////////////////////////////////////////////////////////////
+/**
+ * Records an arbitrary object in the Texture, associated with a specified
+ * key.  The object may later be retrieved by calling get_aux_data() with the
+ * same key.
+ *
+ * These data objects are not recorded to a bam or txo file.
+ */
 void Texture::
 set_aux_data(const string &key, TypedReferenceCount *aux_data) {
   MutexHolder holder(_lock);
   _aux_data[key] = aux_data;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::clear_aux_data
-//       Access: Published
-//  Description: Removes a record previously recorded via
-//               set_aux_data().
-////////////////////////////////////////////////////////////////////
+/**
+ * Removes a record previously recorded via set_aux_data().
+ */
 void Texture::
 clear_aux_data(const string &key) {
   MutexHolder holder(_lock);
   _aux_data.erase(key);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::get_aux_data
-//       Access: Published
-//  Description: Returns a record previously recorded via
-//               set_aux_data().  Returns NULL if there was no record
-//               associated with the indicated key.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns a record previously recorded via set_aux_data().  Returns NULL if
+ * there was no record associated with the indicated key.
+ */
 TypedReferenceCount *Texture::
 get_aux_data(const string &key) const {
   MutexHolder holder(_lock);
@@ -630,19 +820,14 @@ get_aux_data(const string &key) const {
   return NULL;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_txo
-//       Access: Published
-//  Description: Reads the texture from a Panda texture object.  This
-//               defines the complete Texture specification, including
-//               the image data as well as all texture properties.
-//               This only works if the txo file contains a static
-//               Texture image, as opposed to a subclass of Texture
-//               such as a movie texture.
-//
-//               Pass a real filename if it is available, or empty
-//               string if it is not.
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads the texture from a Panda texture object.  This defines the complete
+ * Texture specification, including the image data as well as all texture
+ * properties.  This only works if the txo file contains a static Texture
+ * image, as opposed to a subclass of Texture such as a movie texture.
+ *
+ * Pass a real filename if it is available, or empty string if it is not.
+ */
 bool Texture::
 read_txo(istream &in, const string &filename) {
   CDWriter cdata(_cycler, true);
@@ -651,18 +836,13 @@ read_txo(istream &in, const string &filename) {
   return do_read_txo(cdata, in, filename);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::make_from_txo
-//       Access: Published, Static
-//  Description: Constructs a new Texture object from the txo file.
-//               This is similar to Texture::read_txo(), but it
-//               constructs and returns a new object, which allows it
-//               to return a subclass of Texture (for instance, a
-//               movie texture).
-//
-//               Pass a real filename if it is available, or empty
-//               string if it is not.
-////////////////////////////////////////////////////////////////////
+/**
+ * Constructs a new Texture object from the txo file.  This is similar to
+ * Texture::read_txo(), but it constructs and returns a new object, which
+ * allows it to return a subclass of Texture (for instance, a movie texture).
+ *
+ * Pass a real filename if it is available, or empty string if it is not.
+ */
 PT(Texture) Texture::
 make_from_txo(istream &in, const string &filename) {
   DatagramInputFile din;
@@ -696,9 +876,9 @@ make_from_txo(istream &in, const string &filename) {
   if (object != (TypedWritable *)NULL &&
       object->is_exact_type(BamCacheRecord::get_class_type())) {
     // Here's a special case: if the first object in the file is a
-    // BamCacheRecord, it's really a cache data file and not a true
-    // txo file; but skip over the cache data record and let the user
-    // treat it like an ordinary txo file.
+    // BamCacheRecord, it's really a cache data file and not a true txo file;
+    // but skip over the cache data record and let the user treat it like an
+    // ordinary txo file.
     object = reader.read_object();
   }
 
@@ -724,33 +904,28 @@ make_from_txo(istream &in, const string &filename) {
   return other;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::write_txo
-//       Access: Published
-//  Description: Writes the texture to a Panda texture object.  This
-//               defines the complete Texture specification, including
-//               the image data as well as all texture properties.
-//
-//               The filename is just for reference.
-////////////////////////////////////////////////////////////////////
+/**
+ * Writes the texture to a Panda texture object.  This defines the complete
+ * Texture specification, including the image data as well as all texture
+ * properties.
+ *
+ * The filename is just for reference.
+ */
 bool Texture::
 write_txo(ostream &out, const string &filename) const {
   CDReader cdata(_cycler);
   return do_write_txo(cdata, out, filename);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds
-//       Access: Published
-//  Description: Reads the texture from a DDS file object.  This is a
-//               Microsoft-defined file format; it is similar in
-//               principle to a txo object, in that it is designed to
-//               contain the texture image in a form as similar as
-//               possible to its runtime image, and it can contain
-//               mipmaps, pre-compressed textures, and so on.
-//
-//               As with read_txo, the filename is just for reference.
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads the texture from a DDS file object.  This is a Microsoft-defined file
+ * format; it is similar in principle to a txo object, in that it is designed
+ * to contain the texture image in a form as similar as possible to its
+ * runtime image, and it can contain mipmaps, pre-compressed textures, and so
+ * on.
+ *
+ * As with read_txo, the filename is just for reference.
+ */
 bool Texture::
 read_dds(istream &in, const string &filename, bool header_only) {
   CDWriter cdata(_cycler, true);
@@ -759,14 +934,28 @@ read_dds(istream &in, const string &filename, bool header_only) {
   return do_read_dds(cdata, in, filename, header_only);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::load_related
-//       Access: Published
-//  Description: Loads a texture whose filename is derived by
-//               concatenating a suffix to the filename of this
-//               texture.  May return NULL, for example, if this
-//               texture doesn't have a filename.
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads the texture from a KTX file object.  This is a Khronos-defined file
+ * format; it is similar in principle to a dds object, in that it is designed
+ * to contain the texture image in a form as similar as possible to its
+ * runtime image, and it can contain mipmaps, pre-compressed textures, and so
+ * on.
+ *
+ * As with read_dds, the filename is just for reference.
+ */
+bool Texture::
+read_ktx(istream &in, const string &filename, bool header_only) {
+  CDWriter cdata(_cycler, true);
+  cdata->inc_properties_modified();
+  cdata->inc_image_modified();
+  return do_read_ktx(cdata, in, filename, header_only);
+}
+
+/**
+ * Loads a texture whose filename is derived by concatenating a suffix to the
+ * filename of this texture.  May return NULL, for example, if this texture
+ * doesn't have a filename.
+ */
 Texture *Texture::
 load_related(const InternalName *suffix) const {
   MutexHolder holder(_lock);
@@ -790,39 +979,35 @@ load_related(const InternalName *suffix) const {
                                    suffix->get_name());
     VirtualFileSystem *vfs = VirtualFileSystem::get_global_ptr();
     if (vfs->exists(alph)) {
-      // The alpha variant of the filename, with the suffix, exists.
-      // Use it to load the texture.
+      // The alpha variant of the filename, with the suffix, exists.  Use it
+      // to load the texture.
       res = TexturePool::load_texture(main, alph,
                                       cdata->_primary_file_num_channels,
                                       cdata->_alpha_file_channel, false);
     } else {
-      // If the alpha variant of the filename doesn't exist, just go
-      // ahead and load the related texture without alpha.
+      // If the alpha variant of the filename doesn't exist, just go ahead and
+      // load the related texture without alpha.
       res = TexturePool::load_texture(main);
     }
 
   } else {
-    // No alpha filename--just load the single file.  It doesn't
-    // necessarily have the same number of channels as this one.
+    // No alpha filename--just load the single file.  It doesn't necessarily
+    // have the same number of channels as this one.
     res = TexturePool::load_texture(main);
   }
 
-  // I'm casting away the const-ness of 'this' because this
-  // field is only a cache.
+  // I'm casting away the const-ness of 'this' because this field is only a
+  // cache.
   ((Texture *)this)->_related_textures.insert(RelatedTextures::value_type(suffix, res));
   return res;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::set_ram_image_as
-//       Access: Published
-//  Description: Replaces the current system-RAM image with the new
-//               data, converting it first if necessary from the
-//               indicated component-order format.  See
-//               get_ram_image_as() for specifications about the
-//               format.  This method cannot support compressed image
-//               data or sub-pages; use set_ram_image() for that.
-////////////////////////////////////////////////////////////////////
+/**
+ * Replaces the current system-RAM image with the new data, converting it
+ * first if necessary from the indicated component-order format.  See
+ * get_ram_image_as() for specifications about the format.  This method cannot
+ * support compressed image data or sub-pages; use set_ram_image() for that.
+ */
 void Texture::
 set_ram_image_as(CPTA_uchar image, const string &supplied_format) {
   CDWriter cdata(_cycler, true);
@@ -888,8 +1073,11 @@ set_ram_image_as(CPTA_uchar image, const string &supplied_format) {
         } else if (format.at(s) == 'R') {
           component = 2;
         } else if (format.at(s) == 'A') {
-          nassertv(cdata->_num_components != 3);
-          component = cdata->_num_components - 1;
+          if (cdata->_num_components != 3) {
+            component = cdata->_num_components - 1;
+          } else {
+            // Ignore.
+          }
         } else if (format.at(s) == '0') {
           // Ignore.
         } else if (format.at(s) == '1') {
@@ -917,8 +1105,11 @@ set_ram_image_as(CPTA_uchar image, const string &supplied_format) {
       } else if (format.at(s) == 'R') {
         component = 2;
       } else if (format.at(s) == 'A') {
-        nassertv(cdata->_num_components != 3);
-        component = cdata->_num_components - 1;
+        if (cdata->_num_components != 3) {
+          component = cdata->_num_components - 1;
+        } else {
+          // Ignore.
+        }
       } else if (format.at(s) == '0') {
         // Ignore.
       } else if (format.at(s) == '1') {
@@ -939,52 +1130,40 @@ set_ram_image_as(CPTA_uchar image, const string &supplied_format) {
   return;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::get_keep_ram_image
-//       Access: Published, Virtual
-//  Description: Returns the flag that indicates whether this Texture
-//               is eligible to have its main RAM copy of the texture
-//               memory dumped when the texture is prepared for
-//               rendering.  See set_keep_ram_image().
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the flag that indicates whether this Texture is eligible to have
+ * its main RAM copy of the texture memory dumped when the texture is prepared
+ * for rendering.  See set_keep_ram_image().
+ */
 bool Texture::
 get_keep_ram_image() const {
   CDReader cdata(_cycler);
   return cdata->_keep_ram_image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::is_cacheable
-//       Access: Published, Virtual
-//  Description: Returns true if there is enough information in this
-//               Texture object to write it to the bam cache
-//               successfully, false otherwise.  For most textures,
-//               this is the same as has_ram_image().
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if there is enough information in this Texture object to write
+ * it to the bam cache successfully, false otherwise.  For most textures, this
+ * is the same as has_ram_image().
+ */
 bool Texture::
 is_cacheable() const {
   CDReader cdata(_cycler);
   return do_has_bam_rawdata(cdata);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::get_num_loadable_ram_mipmap_images
-//       Access: Published
-//  Description: Returns the number of contiguous mipmap levels that
-//               exist in RAM, up until the first gap in the sequence.
-//               It is guaranteed that at least mipmap levels [0,
-//               get_num_ram_mipmap_images()) exist.
-//
-//               The number returned will never exceed the number of
-//               required mipmap images based on the size of the
-//               texture and its filter mode.
-//
-//               This method is different from
-//               get_num_ram_mipmap_images() in that it returns only
-//               the number of mipmap levels that can actually be
-//               usefully loaded, regardless of the actual number that
-//               may be stored.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the number of contiguous mipmap levels that exist in RAM, up until
+ * the first gap in the sequence.  It is guaranteed that at least mipmap
+ * levels [0, get_num_ram_mipmap_images()) exist.
+ *
+ * The number returned will never exceed the number of required mipmap images
+ * based on the size of the texture and its filter mode.
+ *
+ * This method is different from get_num_ram_mipmap_images() in that it
+ * returns only the number of mipmap levels that can actually be usefully
+ * loaded, regardless of the actual number that may be stored.
+ */
 int Texture::
 get_num_loadable_ram_mipmap_images() const {
   CDReader cdata(_cycler);
@@ -993,13 +1172,11 @@ get_num_loadable_ram_mipmap_images() const {
     return 0;
   }
   if (!uses_mipmaps()) {
-    // If we have a base image and don't require mipmapping, the
-    // answer is 1.
+    // If we have a base image and don't require mipmapping, the answer is 1.
     return 1;
   }
 
-  // Check that we have enough mipmap levels to meet the size
-  // requirements.
+  // Check that we have enough mipmap levels to meet the size requirements.
   int size = max(cdata->_x_size, max(cdata->_y_size, cdata->_z_size));
   int n = 0;
   int x = 1;
@@ -1015,13 +1192,10 @@ get_num_loadable_ram_mipmap_images() const {
   return n;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::get_ram_mipmap_image
-//       Access: Published
-//  Description: Returns the system-RAM image data associated with the
-//               nth mipmap level, if present.  Returns NULL if the
-//               nth mipmap level is not present.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the system-RAM image data associated with the nth mipmap level, if
+ * present.  Returns NULL if the nth mipmap level is not present.
+ */
 CPTA_uchar Texture::
 get_ram_mipmap_image(int n) const {
   CDReader cdata(_cycler);
@@ -1031,14 +1205,11 @@ get_ram_mipmap_image(int n) const {
   return CPTA_uchar(get_class_type());
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::get_ram_mipmap_pointer
-//       Access: Published
-//  Description: Similiar to get_ram_mipmap_image(), however, in this
-//               case the void pointer for the given ram image is
-//               returned.  This will be NULL unless it has been
-//               explicitly set.
-////////////////////////////////////////////////////////////////////
+/**
+ * Similiar to get_ram_mipmap_image(), however, in this case the void pointer
+ * for the given ram image is returned.  This will be NULL unless it has been
+ * explicitly set.
+ */
 void *Texture::
 get_ram_mipmap_pointer(int n) const {
   CDReader cdata(_cycler);
@@ -1048,20 +1219,16 @@ get_ram_mipmap_pointer(int n) const {
   return NULL;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::set_ram_mipmap_pointer
-//       Access: Published
-//  Description: Sets an explicit void pointer as the texture's mipmap
-//               image for the indicated level.  This is a special
-//               call to direct a texture to reference some external
-//               image location, for instance from a webcam input.
-//
-//               The texture will henceforth reference this pointer
-//               directly, instead of its own internal storage; the
-//               user is responsible for ensuring the data at this
-//               address remains allocated and valid, and in the
-//               correct format, during the lifetime of the texture.
-////////////////////////////////////////////////////////////////////
+/**
+ * Sets an explicit void pointer as the texture's mipmap image for the
+ * indicated level.  This is a special call to direct a texture to reference
+ * some external image location, for instance from a webcam input.
+ *
+ * The texture will henceforth reference this pointer directly, instead of its
+ * own internal storage; the user is responsible for ensuring the data at this
+ * address remains allocated and valid, and in the correct format, during the
+ * lifetime of the texture.
+ */
 void Texture::
 set_ram_mipmap_pointer(int n, void *image, size_t page_size) {
   CDWriter cdata(_cycler, true);
@@ -1072,33 +1239,26 @@ set_ram_mipmap_pointer(int n, void *image, size_t page_size) {
   }
 
   cdata->_ram_images[n]._page_size = page_size;
-  //_ram_images[n]._image.clear(); wtf is going on?!
+  // _ram_images[n]._image.clear(); wtf is going on?!
   cdata->_ram_images[n]._pointer_image = image;
   cdata->inc_image_modified();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::set_ram_mipmap_pointer_from_int
-//       Access: Published
-//  Description: Accepts a raw pointer cast as an int, which is then
-//               passed to set_ram_mipmap_pointer(); see the
-//               documentation for that method.
-//
-//               This variant is particularly useful to set an
-//               external pointer from a language like Python, which
-//               doesn't support void pointers directly.
-////////////////////////////////////////////////////////////////////
+/**
+ * Accepts a raw pointer cast as an int, which is then passed to
+ * set_ram_mipmap_pointer(); see the documentation for that method.
+ *
+ * This variant is particularly useful to set an external pointer from a
+ * language like Python, which doesn't support void pointers directly.
+ */
 void Texture::
 set_ram_mipmap_pointer_from_int(long long pointer, int n, int page_size) {
   set_ram_mipmap_pointer(n, (void*)pointer, (size_t)page_size);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::clear_ram_mipmap_image
-//       Access: Published
-//  Description: Discards the current system-RAM image for the nth
-//               mipmap level.
-////////////////////////////////////////////////////////////////////
+/**
+ * Discards the current system-RAM image for the nth mipmap level.
+ */
 void Texture::
 clear_ram_mipmap_image(int n) {
   CDWriter cdata(_cycler, true);
@@ -1110,26 +1270,21 @@ clear_ram_mipmap_image(int n) {
   cdata->_ram_images[n]._pointer_image = NULL;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::modify_simple_ram_image
-//       Access: Published
-//  Description: Returns a modifiable pointer to the internal "simple"
-//               texture image.  See set_simple_ram_image().
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns a modifiable pointer to the internal "simple" texture image.  See
+ * set_simple_ram_image().
+ */
 PTA_uchar Texture::
 modify_simple_ram_image() {
   CDWriter cdata(_cycler, true);
-  cdata->_simple_image_date_generated = (PN_int32)time(NULL);
+  cdata->_simple_image_date_generated = (int32_t)time(NULL);
   return cdata->_simple_ram_image._image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::new_simple_ram_image
-//       Access: Published
-//  Description: Creates an empty array for the simple ram image of
-//               the indicated size, and returns a modifiable pointer
-//               to the new array.  See set_simple_ram_image().
-////////////////////////////////////////////////////////////////////
+/**
+ * Creates an empty array for the simple ram image of the indicated size, and
+ * returns a modifiable pointer to the new array.  See set_simple_ram_image().
+ */
 PTA_uchar Texture::
 new_simple_ram_image(int x_size, int y_size) {
   CDWriter cdata(_cycler, true);
@@ -1140,20 +1295,17 @@ new_simple_ram_image(int x_size, int y_size) {
   cdata->_simple_y_size = y_size;
   cdata->_simple_ram_image._image = PTA_uchar::empty_array(expected_page_size);
   cdata->_simple_ram_image._page_size = expected_page_size;
-  cdata->_simple_image_date_generated = (PN_int32)time(NULL);
+  cdata->_simple_image_date_generated = (int32_t)time(NULL);
   cdata->inc_simple_image_modified();
 
   return cdata->_simple_ram_image._image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::generate_simple_ram_image
-//       Access: Published
-//  Description: Computes the "simple" ram image by loading the main
-//               RAM image, if it is not already available, and
-//               reducing it to 16x16 or smaller.  This may be an
-//               expensive operation.
-////////////////////////////////////////////////////////////////////
+/**
+ * Computes the "simple" ram image by loading the main RAM image, if it is not
+ * already available, and reducing it to 16x16 or smaller.  This may be an
+ * expensive operation.
+ */
 void Texture::
 generate_simple_ram_image() {
   CDWriter cdata(_cycler, true);
@@ -1172,8 +1324,8 @@ generate_simple_ram_image() {
   int x_size = simple_image_size.get_word(0);
   int y_size = simple_image_size.get_word(1);
 
-  // Limit it to no larger than the source image, and also make it a
-  // power of two.
+  // Limit it to no larger than the source image, and also make it a power of
+  // two.
   x_size = down_to_power_2(min(x_size, cdata->_x_size));
   y_size = down_to_power_2(min(y_size, cdata->_y_size));
 
@@ -1229,25 +1381,21 @@ generate_simple_ram_image() {
   convert_from_pnmimage(image, expected_page_size, x_size, 0, 0, 0, scaled, 4, 1);
 
   do_set_simple_ram_image(cdata, image, x_size, y_size);
-  cdata->_simple_image_date_generated = (PN_int32)time(NULL);
+  cdata->_simple_image_date_generated = (int32_t)time(NULL);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::peek
-//       Access: Published
-//  Description: Returns a TexturePeeker object that can be used to
-//               examine the individual texels stored within this
-//               Texture by (u, v) coordinate.
-//
-//               If the texture has a ram image resident, that image
-//               is used.  If it does not have a full ram image but
-//               does have a simple_ram_image resident, that image is
-//               used instead.  If neither image is resident the full
-//               image is reloaded.
-//
-//               Returns NULL if the texture cannot find an image to
-//               load, or the texture format is incompatible.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns a TexturePeeker object that can be used to examine the individual
+ * texels stored within this Texture by (u, v) coordinate.
+ *
+ * If the texture has a ram image resident, that image is used.  If it does
+ * not have a full ram image but does have a simple_ram_image resident, that
+ * image is used instead.  If neither image is resident the full image is
+ * reloaded.
+ *
+ * Returns NULL if the texture cannot find an image to load, or the texture
+ * format is incompatible.
+ */
 PT(TexturePeeker) Texture::
 peek() {
   CDWriter cdata(_cycler, unlocked_ensure_ram_image(true));
@@ -1260,30 +1408,24 @@ peek() {
   return NULL;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::prepare
-//       Access: Published
-//  Description: Indicates that the texture should be enqueued to be
-//               prepared in the indicated prepared_objects at the
-//               beginning of the next frame.  This will ensure the
-//               texture is already loaded into texture memory if it
-//               is expected to be rendered soon.
-//
-//               Use this function instead of prepare_now() to preload
-//               textures from a user interface standpoint.
-////////////////////////////////////////////////////////////////////
+/**
+ * Indicates that the texture should be enqueued to be prepared in the
+ * indicated prepared_objects at the beginning of the next frame.  This will
+ * ensure the texture is already loaded into texture memory if it is expected
+ * to be rendered soon.
+ *
+ * Use this function instead of prepare_now() to preload textures from a user
+ * interface standpoint.
+ */
 void Texture::
 prepare(PreparedGraphicsObjects *prepared_objects) {
   prepared_objects->enqueue_texture(this);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::is_prepared
-//       Access: Published
-//  Description: Returns true if the texture has already been prepared
-//               or enqueued for preparation on the indicated GSG,
-//               false otherwise.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if the texture has already been prepared or enqueued for
+ * preparation on the indicated GSG, false otherwise.
+ */
 bool Texture::
 is_prepared(PreparedGraphicsObjects *prepared_objects) const {
   MutexHolder holder(_lock);
@@ -1295,14 +1437,11 @@ is_prepared(PreparedGraphicsObjects *prepared_objects) const {
   return prepared_objects->is_texture_queued(this);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::was_image_modified
-//       Access: Published
-//  Description: Returns true if the texture needs to be re-loaded
-//               onto the indicated GSG, either because its image data
-//               is out-of-date, or because it's not fully prepared
-//               now.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if the texture needs to be re-loaded onto the indicated GSG,
+ * either because its image data is out-of-date, or because it's not fully
+ * prepared now.
+ */
 bool Texture::
 was_image_modified(PreparedGraphicsObjects *prepared_objects) const {
   MutexHolder holder(_lock);
@@ -1328,17 +1467,13 @@ was_image_modified(PreparedGraphicsObjects *prepared_objects) const {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::get_data_size_bytes
-//       Access: Public
-//  Description: Returns the number of bytes which the texture is
-//               reported to consume within graphics memory, for the
-//               indicated GSG.  This may return a nonzero value even
-//               if the texture is not currently resident; you should
-//               also check get_resident() if you want to know how
-//               much space the texture is actually consuming right
-//               now.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the number of bytes which the texture is reported to consume within
+ * graphics memory, for the indicated GSG.  This may return a nonzero value
+ * even if the texture is not currently resident; you should also check
+ * get_resident() if you want to know how much space the texture is actually
+ * consuming right now.
+ */
 size_t Texture::
 get_data_size_bytes(PreparedGraphicsObjects *prepared_objects) const {
   MutexHolder holder(_lock);
@@ -1362,12 +1497,10 @@ get_data_size_bytes(PreparedGraphicsObjects *prepared_objects) const {
   return total_size;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::get_active
-//       Access: Public
-//  Description: Returns true if this Texture was rendered in the most
-//               recent frame within the indicated GSG.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if this Texture was rendered in the most recent frame within
+ * the indicated GSG.
+ */
 bool Texture::
 get_active(PreparedGraphicsObjects *prepared_objects) const {
   MutexHolder holder(_lock);
@@ -1391,13 +1524,10 @@ get_active(PreparedGraphicsObjects *prepared_objects) const {
   return false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::get_resident
-//       Access: Public
-//  Description: Returns true if this Texture is reported to be
-//               resident within graphics memory for the indicated
-//               GSG.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if this Texture is reported to be resident within graphics
+ * memory for the indicated GSG.
+ */
 bool Texture::
 get_resident(PreparedGraphicsObjects *prepared_objects) const {
   MutexHolder holder(_lock);
@@ -1421,13 +1551,10 @@ get_resident(PreparedGraphicsObjects *prepared_objects) const {
   return false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::release
-//       Access: Published
-//  Description: Frees the texture context only on the indicated object,
-//               if it exists there.  Returns true if it was released,
-//               false if it had not been prepared.
-////////////////////////////////////////////////////////////////////
+/**
+ * Frees the texture context only on the indicated object, if it exists there.
+ * Returns true if it was released, false if it had not been prepared.
+ */
 bool Texture::
 release(PreparedGraphicsObjects *prepared_objects) {
   MutexHolder holder(_lock);
@@ -1450,20 +1577,17 @@ release(PreparedGraphicsObjects *prepared_objects) {
   return prepared_objects->dequeue_texture(this);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::release_all
-//       Access: Published
-//  Description: Frees the context allocated on all objects for which
-//               the texture has been declared.  Returns the number of
-//               contexts which have been freed.
-////////////////////////////////////////////////////////////////////
+/**
+ * Frees the context allocated on all objects for which the texture has been
+ * declared.  Returns the number of contexts which have been freed.
+ */
 int Texture::
 release_all() {
   MutexHolder holder(_lock);
 
   // We have to traverse a copy of the _prepared_views list, because the
-  // PreparedGraphicsObjects object will call clear_prepared() in response
-  // to each release_texture(), and we don't want to be modifying the
+  // PreparedGraphicsObjects object will call clear_prepared() in response to
+  // each release_texture(), and we don't want to be modifying the
   // _prepared_views list while we're traversing it.
   PreparedViews temp;
   temp.swap(_prepared_views);
@@ -1486,12 +1610,10 @@ release_all() {
   return num_freed;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::write
-//       Access: Published
-//  Description: Not to be confused with write(Filename), this method
-//               simply describes the texture properties.
-////////////////////////////////////////////////////////////////////
+/**
+ * Not to be confused with write(Filename), this method simply describes the
+ * texture properties.
+ */
 void Texture::
 write(ostream &out, int indent_level) const {
   CDReader cdata(_cycler);
@@ -1525,6 +1647,10 @@ write(ostream &out, int indent_level) const {
     out << "cube map, " << cdata->_x_size << " x " << cdata->_y_size;
     break;
 
+  case TT_cube_map_array:
+    out << "cube map array, " << cdata->_x_size << " x " << cdata->_y_size << " x " << cdata->_z_size;
+    break;
+
   case TT_buffer_texture:
     out << "buffer, " << cdata->_x_size;
     break;
@@ -1538,19 +1664,24 @@ write(ostream &out, int indent_level) const {
 
   switch (cdata->_component_type) {
   case T_unsigned_byte:
+  case T_byte:
     out << " bytes";
     break;
 
   case T_unsigned_short:
+  case T_short:
     out << " shorts";
     break;
 
+  case T_half_float:
+    out << " half";
   case T_float:
     out << " floats";
     break;
 
   case T_unsigned_int_24_8:
   case T_int:
+  case T_unsigned_int:
     out << " ints";
     break;
 
@@ -1645,6 +1776,10 @@ write(ostream &out, int indent_level) const {
   case F_r16:
     out << "r16";
     break;
+  case F_r16i:
+    out << "r16i";
+    break;
+
   case F_rg16:
     out << "rg16";
     break;
@@ -1690,6 +1825,19 @@ write(ostream &out, int indent_level) const {
     break;
   case F_rgba8i:
     out << "rgba8i";
+    break;
+  case F_r11_g11_b10:
+    out << "r11_g11_b10";
+    break;
+  case F_rgb9_e5:
+    out << "rgb9_e5";
+    break;
+  case F_rgb10_a2:
+    out << "rgb10_a2";
+    break;
+
+  case F_rg:
+    out << "rg";
     break;
   }
 
@@ -1739,13 +1887,10 @@ write(ostream &out, int indent_level) const {
 }
 
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::set_size_padded
-//       Access: Published
-//  Description: Changes the size of the texture, padding
-//               if necessary, and setting the pad region
-//               as well.
-////////////////////////////////////////////////////////////////////
+/**
+ * Changes the size of the texture, padding if necessary, and setting the pad
+ * region as well.
+ */
 void Texture::
 set_size_padded(int x, int y, int z) {
   CDWriter cdata(_cycler, true);
@@ -1754,8 +1899,8 @@ set_size_padded(int x, int y, int z) {
     do_set_y_size(cdata, up_to_power_2(y));
 
     if (cdata->_texture_type == TT_3d_texture) {
-      // Only pad 3D textures.  It does not make sense
-      // to do so for cube maps or 2D texture arrays.
+      // Only pad 3D textures.  It does not make sense to do so for cube maps
+      // or 2D texture arrays.
       do_set_z_size(cdata, up_to_power_2(z));
     } else {
       do_set_z_size(cdata, z);
@@ -1771,12 +1916,10 @@ set_size_padded(int x, int y, int z) {
                   cdata->_z_size - z);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::set_orig_file_size
-//       Access: Published
-//  Description: Specifies the size of the texture as it exists in its
-//               original disk file, before any Panda scaling.
-////////////////////////////////////////////////////////////////////
+/**
+ * Specifies the size of the texture as it exists in its original disk file,
+ * before any Panda scaling.
+ */
 void Texture::
 set_orig_file_size(int x, int y, int z) {
   CDWriter cdata(_cycler, true);
@@ -1786,22 +1929,17 @@ set_orig_file_size(int x, int y, int z) {
   nassertv(z == cdata->_z_size);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::prepare_now
-//       Access: Published
-//  Description: Creates a context for the texture on the particular
-//               GSG, if it does not already exist.  Returns the new
-//               (or old) TextureContext.  This assumes that the
-//               GraphicsStateGuardian is the currently active
-//               rendering context and that it is ready to accept new
-//               textures.  If this is not necessarily the case, you
-//               should use prepare() instead.
-//
-//               Normally, this is not called directly except by the
-//               GraphicsStateGuardian; a texture does not need to be
-//               explicitly prepared by the user before it may be
-//               rendered.
-////////////////////////////////////////////////////////////////////
+/**
+ * Creates a context for the texture on the particular GSG, if it does not
+ * already exist.  Returns the new (or old) TextureContext.  This assumes that
+ * the GraphicsStateGuardian is the currently active rendering context and
+ * that it is ready to accept new textures.  If this is not necessarily the
+ * case, you should use prepare() instead.
+ *
+ * Normally, this is not called directly except by the GraphicsStateGuardian;
+ * a texture does not need to be explicitly prepared by the user before it may
+ * be rendered.
+ */
 TextureContext *Texture::
 prepare_now(int view,
             PreparedGraphicsObjects *prepared_objects,
@@ -1826,12 +1964,9 @@ prepare_now(int view,
   return tc;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::up_to_power_2
-//       Access: Published, Static
-//  Description: Returns the smallest power of 2 greater than or equal
-//               to value.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the smallest power of 2 greater than or equal to value.
+ */
 int Texture::
 up_to_power_2(int value) {
   if (value <= 1) {
@@ -1841,12 +1976,9 @@ up_to_power_2(int value) {
   return (1 << bit);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::down_to_power_2
-//       Access: Published, Static
-//  Description: Returns the largest power of 2 less than or equal
-//               to value.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the largest power of 2 less than or equal to value.
+ */
 int Texture::
 down_to_power_2(int value) {
   if (value <= 1) {
@@ -1856,39 +1988,31 @@ down_to_power_2(int value) {
   return (1 << bit);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::consider_rescale
-//       Access: Published
-//  Description: Asks the PNMImage to change its scale when it reads
-//               the image, according to the whims of the Config.prc
-//               file.
-//
-//               For most efficient results, this method should be
-//               called after pnmimage.read_header() has been called,
-//               but before pnmimage.read().  This method may also be
-//               called after pnmimage.read(), i.e. when the pnmimage
-//               is already loaded; in this case it will rescale the
-//               image on the spot.  Also see rescale_texture().
-////////////////////////////////////////////////////////////////////
+/**
+ * Asks the PNMImage to change its scale when it reads the image, according to
+ * the whims of the Config.prc file.
+ *
+ * For most efficient results, this method should be called after
+ * pnmimage.read_header() has been called, but before pnmimage.read().  This
+ * method may also be called after pnmimage.read(), i.e.  when the pnmimage is
+ * already loaded; in this case it will rescale the image on the spot.  Also
+ * see rescale_texture().
+ */
 void Texture::
 consider_rescale(PNMImage &pnmimage) {
   consider_rescale(pnmimage, get_name(), get_auto_texture_scale());
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::consider_rescale
-//       Access: Published, Static
-//  Description: Asks the PNMImage to change its scale when it reads
-//               the image, according to the whims of the Config.prc
-//               file.
-//
-//               For most efficient results, this method should be
-//               called after pnmimage.read_header() has been called,
-//               but before pnmimage.read().  This method may also be
-//               called after pnmimage.read(), i.e. when the pnmimage
-//               is already loaded; in this case it will rescale the
-//               image on the spot.  Also see rescale_texture().
-////////////////////////////////////////////////////////////////////
+/**
+ * Asks the PNMImage to change its scale when it reads the image, according to
+ * the whims of the Config.prc file.
+ *
+ * For most efficient results, this method should be called after
+ * pnmimage.read_header() has been called, but before pnmimage.read().  This
+ * method may also be called after pnmimage.read(), i.e.  when the pnmimage is
+ * already loaded; in this case it will rescale the image on the spot.  Also
+ * see rescale_texture().
+ */
 void Texture::
 consider_rescale(PNMImage &pnmimage, const string &name, AutoTextureScale auto_texture_scale) {
   int new_x_size = pnmimage.get_x_size();
@@ -1902,19 +2026,16 @@ consider_rescale(PNMImage &pnmimage, const string &name, AutoTextureScale auto_t
       new_image.quick_filter_from(pnmimage);
       pnmimage.take_from(new_image);
     } else {
-      // Rescale while reading.  Some image types (e.g. jpeg) can take
+      // Rescale while reading.  Some image types (e.g.  jpeg) can take
       // advantage of this.
       pnmimage.set_read_size(new_x_size, new_y_size);
     }
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::format_texture_type
-//       Access: Published, Static
-//  Description: Returns the indicated TextureType converted to a
-//               string word.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the indicated TextureType converted to a string word.
+ */
 string Texture::
 format_texture_type(TextureType tt) {
   switch (tt) {
@@ -1928,18 +2049,17 @@ format_texture_type(TextureType tt) {
     return "2d_texture_array";
   case TT_cube_map:
     return "cube_map";
+  case TT_cube_map_array:
+    return "cube_map_array";
   case TT_buffer_texture:
     return "buffer_texture";
   }
   return "**invalid**";
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::string_texture_type
-//       Access: Published, Static
-//  Description: Returns the TextureType corresponding to the
-//               indicated string word.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the TextureType corresponding to the indicated string word.
+ */
 Texture::TextureType Texture::
 string_texture_type(const string &str) {
   if (cmp_nocase(str, "1d_texture") == 0) {
@@ -1952,6 +2072,8 @@ string_texture_type(const string &str) {
     return TT_2d_texture_array;
   } else if (cmp_nocase(str, "cube_map") == 0) {
     return TT_cube_map;
+  } else if (cmp_nocase(str, "cube_map_array") == 0) {
+    return TT_cube_map_array;
   } else if (cmp_nocase(str, "buffer_texture") == 0) {
     return TT_buffer_texture;
   }
@@ -1961,12 +2083,9 @@ string_texture_type(const string &str) {
   return TT_2d_texture;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::format_component_type
-//       Access: Published, Static
-//  Description: Returns the indicated ComponentType converted to a
-//               string word.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the indicated ComponentType converted to a string word.
+ */
 string Texture::
 format_component_type(ComponentType ct) {
   switch (ct) {
@@ -1980,17 +2099,22 @@ format_component_type(ComponentType ct) {
     return "unsigned_int_24_8";
   case T_int:
     return "int";
+  case T_byte:
+    return "unsigned_byte";
+  case T_short:
+    return "short";
+  case T_half_float:
+    return "half_float";
+  case T_unsigned_int:
+    return "unsigned_int";
   }
 
   return "**invalid**";
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::string_component_type
-//       Access: Published, Static
-//  Description: Returns the ComponentType corresponding to the
-//               indicated string word.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the ComponentType corresponding to the indicated string word.
+ */
 Texture::ComponentType Texture::
 string_component_type(const string &str) {
   if (cmp_nocase(str, "unsigned_byte") == 0) {
@@ -2003,6 +2127,14 @@ string_component_type(const string &str) {
     return T_unsigned_int_24_8;
   } else if (cmp_nocase(str, "int") == 0) {
     return T_int;
+  } else if (cmp_nocase(str, "byte") == 0) {
+    return T_byte;
+  } else if (cmp_nocase(str, "short") == 0) {
+    return T_short;
+  } else if (cmp_nocase(str, "half_float") == 0) {
+    return T_half_float;
+  } else if (cmp_nocase(str, "unsigned_int") == 0) {
+    return T_unsigned_int;
   }
 
   gobj_cat->error()
@@ -2010,12 +2142,9 @@ string_component_type(const string &str) {
   return T_unsigned_byte;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::format_format
-//       Access: Published, Static
-//  Description: Returns the indicated Format converted to a
-//               string word.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the indicated Format converted to a string word.
+ */
 string Texture::
 format_format(Format format) {
   switch (format) {
@@ -2073,6 +2202,8 @@ format_format(Format format) {
     return "rgba32";
   case F_r16:
     return "r16";
+  case F_r16i:
+    return "r16i";
   case F_rg16:
     return "rg16";
   case F_rgb16:
@@ -2101,16 +2232,21 @@ format_format(Format format) {
     return "rgb8i";
   case F_rgba8i:
     return "rgba8i";
+  case F_r11_g11_b10:
+    return "r11g11b10";
+  case F_rgb9_e5:
+    return "rgb9_e5";
+  case F_rgb10_a2:
+    return "rgb10_a2";
+  case F_rg:
+    return "rg";
   }
   return "**invalid**";
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::string_format
-//       Access: Published, Static
-//  Description: Returns the Format corresponding to the
-//               indicated string word.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the Format corresponding to the indicated string word.
+ */
 Texture::Format Texture::
 string_format(const string &str) {
   if (cmp_nocase(str, "depth_stencil") == 0) {
@@ -2167,6 +2303,8 @@ string_format(const string &str) {
     return F_rgba32;
   } else if (cmp_nocase(str, "r16") == 0 || cmp_nocase(str, "red16") == 0) {
     return F_r16;
+  } else if (cmp_nocase(str, "r16i") == 0) {
+    return F_r16i;
   } else if (cmp_nocase(str, "rg16") == 0 || cmp_nocase(str, "r16g16") == 0) {
     return F_rg16;
   } else if (cmp_nocase(str, "rgb16") == 0 || cmp_nocase(str, "r16g16b16") == 0) {
@@ -2187,6 +2325,14 @@ string_format(const string &str) {
     return F_rg32;
   } else if (cmp_nocase(str, "rgb32") == 0 || cmp_nocase(str, "r32g32b32") == 0) {
     return F_rgb32;
+  } else if (cmp_nocase(str, "r11g11b10") == 0) {
+    return F_r11_g11_b10;
+  } else if (cmp_nocase(str, "rgb9_e5") == 0) {
+    return F_rgb9_e5;
+  } else if (cmp_nocase_uh(str, "rgb10_a2") == 0 || cmp_nocase(str, "r10g10b10a2") == 0) {
+    return F_rgb10_a2;
+  } else if (cmp_nocase_uh(str, "rg") == 0) {
+    return F_rg;
   }
 
   gobj_cat->error()
@@ -2194,12 +2340,9 @@ string_format(const string &str) {
   return F_rgba;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::format_compression_mode
-//       Access: Published, Static
-//  Description: Returns the indicated CompressionMode converted to a
-//               string word.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the indicated CompressionMode converted to a string word.
+ */
 string Texture::
 format_compression_mode(CompressionMode cm) {
   switch (cm) {
@@ -2225,17 +2368,23 @@ format_compression_mode(CompressionMode cm) {
     return "pvr1_2bpp";
   case CM_pvr1_4bpp:
     return "pvr1_4bpp";
+  case CM_rgtc:
+    return "rgtc";
+  case CM_etc1:
+    return "etc1";
+  case CM_etc2:
+    return "etc2";
+  case CM_eac:
+    return "eac";
   }
 
   return "**invalid**";
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::string_compression_mode
-//       Access: Public
-//  Description: Returns the CompressionMode value associated with the
-//               given string representation.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the CompressionMode value associated with the given string
+ * representation.
+ */
 Texture::CompressionMode Texture::
 string_compression_mode(const string &str) {
   if (cmp_nocase_uh(str, "default") == 0) {
@@ -2260,6 +2409,14 @@ string_compression_mode(const string &str) {
     return CM_pvr1_2bpp;
   } else if (cmp_nocase_uh(str, "pvr1_4bpp") == 0) {
     return CM_pvr1_4bpp;
+  } else if (cmp_nocase_uh(str, "rgtc") == 0) {
+    return CM_rgtc;
+  } else if (cmp_nocase_uh(str, "etc1") == 0) {
+    return CM_etc1;
+  } else if (cmp_nocase_uh(str, "etc2") == 0) {
+    return CM_etc2;
+  } else if (cmp_nocase_uh(str, "eac") == 0) {
+    return CM_eac;
   }
 
   gobj_cat->error()
@@ -2268,12 +2425,9 @@ string_compression_mode(const string &str) {
 }
 
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::format_quality_level
-//       Access: Published, Static
-//  Description: Returns the indicated QualityLevel converted to a
-//               string word.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the indicated QualityLevel converted to a string word.
+ */
 string Texture::
 format_quality_level(QualityLevel ql) {
   switch (ql) {
@@ -2290,12 +2444,10 @@ format_quality_level(QualityLevel ql) {
   return "**invalid**";
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::string_quality_level
-//       Access: Public
-//  Description: Returns the QualityLevel value associated with the
-//               given string representation.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the QualityLevel value associated with the given string
+ * representation.
+ */
 Texture::QualityLevel Texture::
 string_quality_level(const string &str) {
   if (cmp_nocase(str, "default") == 0) {
@@ -2313,26 +2465,23 @@ string_quality_level(const string &str) {
   return QL_default;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::texture_uploaded
-//       Access: Public
-//  Description: This method is called by the GraphicsEngine at the
-//               beginning of the frame *after* a texture has been
-//               successfully uploaded to graphics memory.  It is
-//               intended as a callback so the texture can release its
-//               RAM image, if _keep_ram_image is false.
-//
-//               This is called indirectly when the GSG calls
-//               GraphicsEngine::texture_uploaded().
-////////////////////////////////////////////////////////////////////
+/**
+ * This method is called by the GraphicsEngine at the beginning of the frame
+ * *after* a texture has been successfully uploaded to graphics memory.  It is
+ * intended as a callback so the texture can release its RAM image, if
+ * _keep_ram_image is false.
+ *
+ * This is called indirectly when the GSG calls
+ * GraphicsEngine::texture_uploaded().
+ */
 void Texture::
 texture_uploaded() {
   CDLockedReader cdata(_cycler);
 
   if (!keep_texture_ram && !cdata->_keep_ram_image) {
-    // Once we have prepared the texture, we can generally safely
-    // remove the pixels from main RAM.  The GSG is now responsible
-    // for remembering what it looks like.
+    // Once we have prepared the texture, we can generally safely remove the
+    // pixels from main RAM.  The GSG is now responsible for remembering what
+    // it looks like.
 
     CDWriter cdataw(_cycler, cdata, false);
     if (gobj_cat.is_debug()) {
@@ -2343,55 +2492,53 @@ texture_uploaded() {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::has_cull_callback
-//       Access: Public, Virtual
-//  Description: Should be overridden by derived classes to return
-//               true if cull_callback() has been defined.  Otherwise,
-//               returns false to indicate cull_callback() does not
-//               need to be called for this node during the cull
-//               traversal.
-////////////////////////////////////////////////////////////////////
+/**
+ * Should be overridden by derived classes to return true if cull_callback()
+ * has been defined.  Otherwise, returns false to indicate cull_callback()
+ * does not need to be called for this node during the cull traversal.
+ */
 bool Texture::
 has_cull_callback() const {
   return false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::cull_callback
-//       Access: Public, Virtual
-//  Description: If has_cull_callback() returns true, this function
-//               will be called during the cull traversal to perform
-//               any additional operations that should be performed at
-//               cull time.
-//
-//               This is called each time the Texture is discovered
-//               applied to a Geom in the traversal.  It should return
-//               true if the Geom is visible, false if it should be
-//               omitted.
-////////////////////////////////////////////////////////////////////
+/**
+ * If has_cull_callback() returns true, this function will be called during
+ * the cull traversal to perform any additional operations that should be
+ * performed at cull time.
+ *
+ * This is called each time the Texture is discovered applied to a Geom in the
+ * traversal.  It should return true if the Geom is visible, false if it
+ * should be omitted.
+ */
 bool Texture::
 cull_callback(CullTraverser *, const CullTraverserData &) const {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::make_texture
-//       Access: Public, Static
-//  Description: A factory function to make a new Texture, used to
-//               pass to the TexturePool.
-////////////////////////////////////////////////////////////////////
+/**
+ * A factory function to make a new Texture, used to pass to the TexturePool.
+ */
 PT(Texture) Texture::
 make_texture() {
   return new Texture;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::is_specific
-//       Access: Public, Static
-//  Description: Returns true if the indicated compression mode is one
-//               of the specific compression types, false otherwise.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if the indicated component type is unsigned, false otherwise.
+ */
+bool Texture::
+is_unsigned(Texture::ComponentType ctype) {
+  return (ctype == T_unsigned_byte ||
+          ctype == T_unsigned_short ||
+          ctype == T_unsigned_int_24_8 ||
+          ctype == T_unsigned_int);
+}
+
+/**
+ * Returns true if the indicated compression mode is one of the specific
+ * compression types, false otherwise.
+ */
 bool Texture::
 is_specific(Texture::CompressionMode compression) {
   switch (compression) {
@@ -2405,12 +2552,9 @@ is_specific(Texture::CompressionMode compression) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::has_alpha
-//       Access: Public, Static
-//  Description: Returns true if the indicated format includes alpha,
-//               false otherwise.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if the indicated format includes alpha, false otherwise.
+ */
 bool Texture::
 has_alpha(Format format) {
   switch (format) {
@@ -2427,6 +2571,8 @@ has_alpha(Format format) {
   case F_luminance_alphamask:
   case F_srgb_alpha:
   case F_sluminance_alpha:
+  case F_rgba8i:
+  case F_rgb10_a2:
     return true;
 
   default:
@@ -2434,12 +2580,10 @@ has_alpha(Format format) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::has_binary_alpha
-//       Access: Public, Static
-//  Description: Returns true if the indicated format includes a
-//               binary alpha only, false otherwise.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if the indicated format includes a binary alpha only, false
+ * otherwise.
+ */
 bool Texture::
 has_binary_alpha(Format format) {
   switch (format) {
@@ -2451,12 +2595,10 @@ has_binary_alpha(Format format) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::is_srgb
-//       Access: Public, Static
-//  Description: Returns true if the indicated format is in the
-//               sRGB color space, false otherwise.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if the indicated format is in the sRGB color space, false
+ * otherwise.
+ */
 bool Texture::
 is_srgb(Format format) {
   switch (format) {
@@ -2471,19 +2613,15 @@ is_srgb(Format format) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::adjust_size
-//       Access: Public, Static
-//  Description: Computes the proper size of the texture, based on the
-//               original size, the filename, and the resizing whims
-//               of the config file.
-//
-//               x_size and y_size should be loaded with the texture
-//               image's original size on disk.  On return, they will
-//               be loaded with the texture's in-memory target size.
-//               The return value is true if the size has been
-//               adjusted, or false if it is the same.
-////////////////////////////////////////////////////////////////////
+/**
+ * Computes the proper size of the texture, based on the original size, the
+ * filename, and the resizing whims of the config file.
+ *
+ * x_size and y_size should be loaded with the texture image's original size
+ * on disk.  On return, they will be loaded with the texture's in-memory
+ * target size.  The return value is true if the size has been adjusted, or
+ * false if it is the same.
+ */
 bool Texture::
 adjust_size(int &x_size, int &y_size, const string &name,
             bool for_padding, AutoTextureScale auto_texture_scale) {
@@ -2503,8 +2641,8 @@ adjust_size(int &x_size, int &y_size, const string &name,
     new_x_size = (int)cfloor(new_x_size * texture_scale + 0.5);
     new_y_size = (int)cfloor(new_y_size * texture_scale + 0.5);
 
-    // Don't auto-scale below 4 in either dimension.  This causes
-    // problems for DirectX and texture compression.
+    // Don't auto-scale below 4 in either dimension.  This causes problems for
+    // DirectX and texture compression.
     new_x_size = min(max(new_x_size, (int)texture_scale_limit), x_size);
     new_y_size = min(max(new_y_size, (int)texture_scale_limit), y_size);
   }
@@ -2514,9 +2652,9 @@ adjust_size(int &x_size, int &y_size, const string &name,
     ats = get_textures_power_2();
   }
   if (!for_padding && ats == ATS_pad) {
-    // If we're not calculating the padding size--that is, we're
-    // calculating the initial scaling size instead--then ignore
-    // ATS_pad, and treat it the same as ATS_none.
+    // If we're not calculating the padding size--that is, we're calculating
+    // the initial scaling size instead--then ignore ATS_pad, and treat it the
+    // same as ATS_none.
     ats = ATS_none;
   }
 
@@ -2581,57 +2719,46 @@ adjust_size(int &x_size, int &y_size, const string &name,
   return false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::ensure_loader_type
-//       Access: Public, Virtual
-//  Description: May be called prior to calling read_txo() or any
-//               bam-related Texture-creating callback, to ensure that
-//               the proper dynamic libraries for a Texture of the
-//               current class type, and the indicated filename, have
-//               been already loaded.
-//
-//               This is a low-level function that should not normally
-//               need to be called directly by the user.
-//
-//               Note that for best results you must first create a
-//               Texture object of the appropriate class type for your
-//               filename, for instance with
-//               TexturePool::make_texture().
-////////////////////////////////////////////////////////////////////
+/**
+ * May be called prior to calling read_txo() or any bam-related Texture-
+ * creating callback, to ensure that the proper dynamic libraries for a
+ * Texture of the current class type, and the indicated filename, have been
+ * already loaded.
+ *
+ * This is a low-level function that should not normally need to be called
+ * directly by the user.
+ *
+ * Note that for best results you must first create a Texture object of the
+ * appropriate class type for your filename, for instance with
+ * TexturePool::make_texture().
+ */
 void Texture::
 ensure_loader_type(const Filename &filename) {
   // For a plain Texture type, this doesn't need to do anything.
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::reconsider_dirty
-//       Access: Protected, Virtual
-//  Description: Called by TextureContext to give the Texture a chance
-//               to mark itself dirty before rendering, if necessary.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by TextureContext to give the Texture a chance to mark itself dirty
+ * before rendering, if necessary.
+ */
 void Texture::
 reconsider_dirty() {
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_adjust_this_size
-//       Access: Protected, Virtual
-//  Description: Works like adjust_size, but also considers the
-//               texture class.  Movie textures, for instance, always
-//               pad outwards, regardless of textures-power-2.
-////////////////////////////////////////////////////////////////////
+/**
+ * Works like adjust_size, but also considers the texture class.  Movie
+ * textures, for instance, always pad outwards, regardless of textures-
+ * power-2.
+ */
 bool Texture::
 do_adjust_this_size(const CData *cdata, int &x_size, int &y_size, const string &name,
                     bool for_padding) const {
   return adjust_size(x_size, y_size, name, for_padding, cdata->_auto_texture_scale);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_read
-//       Access: Protected, Virtual
-//  Description: The internal implementation of the various read()
-//               methods.
-////////////////////////////////////////////////////////////////////
+/**
+ * The internal implementation of the various read() methods.
+ */
 bool Texture::
 do_read(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpath,
         int primary_file_num_channels, int alpha_file_channel,
@@ -2649,8 +2776,8 @@ do_read(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpath,
   }
 
   if ((z == 0 || read_pages) && (n == 0 || read_mipmaps)) {
-    // When we re-read the page 0 of the base image, we clear
-    // everything and start over.
+    // When we re-read the page 0 of the base image, we clear everything and
+    // start over.
     do_clear_ram_image(cdata);
   }
 
@@ -2668,15 +2795,21 @@ do_read(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpath,
     return do_read_dds_file(cdata, fullpath, header_only);
   }
 
+  if (is_ktx_filename(fullpath)) {
+    if (record != (BamCacheRecord *)NULL) {
+      record->add_dependent_file(fullpath);
+    }
+    return do_read_ktx_file(cdata, fullpath, header_only);
+  }
+
   // If read_pages or read_mipmaps is specified, then z and n actually
-  // indicate z_size and n_size, respectively--the numerical limits on
-  // which to search for filenames.
+  // indicate z_size and n_size, respectively--the numerical limits on which
+  // to search for filenames.
   int z_size = z;
   int n_size = n;
 
-  // Certain texture types have an implicit z_size.  If z_size is
-  // omitted, choose an appropriate default based on the texture
-  // type.
+  // Certain texture types have an implicit z_size.  If z_size is omitted,
+  // choose an appropriate default based on the texture type.
   if (z_size == 0) {
     switch (cdata->_texture_type) {
     case TT_1d_texture:
@@ -2714,9 +2847,9 @@ do_read(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpath,
 
     n = 0;
     while (true) {
-      // For mipmap level 0, the total number of pages might be
-      // determined by the number of files we find.  After mipmap
-      // level 0, though, the number of pages is predetermined.
+      // For mipmap level 0, the total number of pages might be determined by
+      // the number of files we find.  After mipmap level 0, though, the
+      // number of pages is predetermined.
       if (n != 0) {
         z_size = do_get_expected_mipmap_z_size(cdata, n);
       }
@@ -2759,9 +2892,8 @@ do_read(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpath,
       }
 
       if (n == 0 && n_size == 0) {
-        // If n_size is not specified, it gets implicitly set after we
-        // read the base texture image (which determines the size of
-        // the texture).
+        // If n_size is not specified, it gets implicitly set after we read
+        // the base texture image (which determines the size of the texture).
         n_size = do_get_expected_num_mipmap_levels(cdata);
       }
       ++n;
@@ -2825,8 +2957,8 @@ do_read(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpath,
       ++n;
 
       if (n_size == 0 && n >= do_get_expected_num_mipmap_levels(cdata)) {
-        // Don't try to read more than the requisite number of mipmap
-        // levels (unless the user insisted on it for some reason).
+        // Don't try to read more than the requisite number of mipmap levels
+        // (unless the user insisted on it for some reason).
         break;
       }
 
@@ -2850,29 +2982,26 @@ do_read(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpath,
   cdata->_num_mipmap_levels_read = cdata->_ram_images.size();
 
   if (header_only) {
-    // If we were only supposed to be checking the image header
-    // information, don't let the Texture think that it's got the
-    // image now.
+    // If we were only supposed to be checking the image header information,
+    // don't let the Texture think that it's got the image now.
     do_clear_ram_image(cdata);
   } else {
     if ((options.get_texture_flags() & LoaderOptions::TF_preload) != 0) {
-      // If we intend to keep the ram image around, consider
-      // compressing it etc.
+      // If we intend to keep the ram image around, consider compressing it
+      // etc.
       bool generate_mipmaps = ((options.get_texture_flags() & LoaderOptions::TF_generate_mipmaps) != 0);
-      do_consider_auto_process_ram_image(cdata, generate_mipmaps || uses_mipmaps(), true);
+      bool allow_compression = ((options.get_texture_flags() & LoaderOptions::TF_allow_compression) != 0);
+      do_consider_auto_process_ram_image(cdata, generate_mipmaps || uses_mipmaps(), allow_compression);
     }
   }
 
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_read_one
-//       Access: Protected, Virtual
-//  Description: Called only from do_read(), this method reads a
-//               single image file, either one page or one mipmap
-//               level.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called only from do_read(), this method reads a single image file, either
+ * one page or one mipmap level.
+ */
 bool Texture::
 do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpath,
             int z, int n, int primary_file_num_channels, int alpha_file_channel,
@@ -2892,8 +3021,10 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
   }
   image.copy_header_from(*image_reader);
 
-  // If it's a floating-point image file, read it by default into a
-  // floating-point texture.
+  AutoTextureScale auto_texture_scale = do_get_auto_texture_scale(cdata);
+
+  // If it's a floating-point image file, read it by default into a floating-
+  // point texture.
   bool read_floating_point;
   int texture_load_type = (options.get_texture_flags() & (LoaderOptions::TF_integer | LoaderOptions::TF_float));
   switch (texture_load_type) {
@@ -2906,8 +3037,8 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
     break;
 
   default:
-    // Neither TF_integer nor TF_float was specified; determine which
-    // way the texture wants to be loaded.
+    // Neither TF_integer nor TF_float was specified; determine which way the
+    // texture wants to be loaded.
     read_floating_point = (image_reader->is_floating_point());
     if (!alpha_fullpath.empty()) {
       read_floating_point = false;
@@ -2923,15 +3054,13 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
     }
 
     if (textures_header_only) {
-      // In this mode, we never intend to load the actual texture
-      // image anyway, so we don't even need to make the size right.
+      // In this mode, we never intend to load the actual texture image
+      // anyway, so we don't even need to make the size right.
       x_size = 1;
       y_size = 1;
 
     } else {
-      consider_rescale(image, fullpath.get_basename(), do_get_auto_texture_scale(cdata));
-      x_size = image.get_read_x_size();
-      y_size = image.get_read_y_size();
+      adjust_size(x_size, y_size, fullpath.get_basename(), false, auto_texture_scale);
     }
 
     if (read_floating_point) {
@@ -2949,9 +3078,15 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
 
   } else {
     if (z == 0 && n == 0) {
-      cdata->_orig_file_x_size = image.get_x_size();
-      cdata->_orig_file_y_size = image.get_y_size();
-      consider_rescale(image, fullpath.get_basename(), do_get_auto_texture_scale(cdata));
+      int x_size = image.get_x_size();
+      int y_size = image.get_y_size();
+
+      cdata->_orig_file_x_size = x_size;
+      cdata->_orig_file_y_size = y_size;
+
+      if (adjust_size(x_size, y_size, fullpath.get_basename(), false, auto_texture_scale)) {
+        image.set_read_size(x_size, y_size);
+      }
     } else {
       image.set_read_size(do_get_expected_mipmap_x_size(cdata, n),
                           do_get_expected_mipmap_y_size(cdata, n));
@@ -3035,9 +3170,9 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
       cdata->_filename = fullpath;
       cdata->_alpha_filename = alpha_fullpath;
 
-      // The first time we set the filename via a read() operation, we
-      // clear keep_ram_image.  The user can always set it again later
-      // if he needs to.
+      // The first time we set the filename via a read() operation, we clear
+      // keep_ram_image.  The user can always set it again later if he needs
+      // to.
       cdata->_keep_ram_image = false;
     }
 
@@ -3046,9 +3181,8 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
   }
 
   if (!alpha_fullpath.empty()) {
-    // The grayscale (alpha channel) image must be the same size as
-    // the main image.  This should really have been already
-    // guaranteed by the above.
+    // The grayscale (alpha channel) image must be the same size as the main
+    // image.  This should really have been already guaranteed by the above.
     if (image.get_x_size() != alpha_image.get_x_size() ||
         image.get_y_size() != alpha_image.get_y_size()) {
       gobj_cat.info()
@@ -3074,8 +3208,8 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
   }
 
   if (!alpha_fullpath.empty()) {
-    // Make the original image a 4-component image by taking the
-    // grayscale value from the second image.
+    // Make the original image a 4-component image by taking the grayscale
+    // value from the second image.
     image.add_alpha();
 
     if (alpha_file_channel == 4 ||
@@ -3120,8 +3254,7 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
       return false;
     }
   } else {
-    // Now see if we want to pad the image within a larger power-of-2
-    // image.
+    // Now see if we want to pad the image within a larger power-of-2 image.
     int pad_x_size = 0;
     int pad_y_size = 0;
     if (do_get_auto_texture_scale(cdata) == ATS_pad) {
@@ -3147,19 +3280,16 @@ do_read_one(CData *cdata, const Filename &fullpath, const Filename &alpha_fullpa
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_load_one
-//       Access: Protected, Virtual
-//  Description: Internal method to load a single page or mipmap
-//               level.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to load a single page or mipmap level.
+ */
 bool Texture::
 do_load_one(CData *cdata, const PNMImage &pnmimage, const string &name, int z, int n,
             const LoaderOptions &options) {
   if (cdata->_ram_images.size() <= 1 && n == 0) {
-    // A special case for mipmap level 0.  When we load mipmap level
-    // 0, unless we already have mipmap levels, it determines the
-    // image properties like size and number of components.
+    // A special case for mipmap level 0.  When we load mipmap level 0, unless
+    // we already have mipmap levels, it determines the image properties like
+    // size and number of components.
     if (!do_reconsider_z_size(cdata, z, options)) {
       return false;
     }
@@ -3224,19 +3354,16 @@ do_load_one(CData *cdata, const PNMImage &pnmimage, const string &name, int z, i
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_load_one
-//       Access: Protected, Virtual
-//  Description: Internal method to load a single page or mipmap
-//               level.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to load a single page or mipmap level.
+ */
 bool Texture::
 do_load_one(CData *cdata, const PfmFile &pfm, const string &name, int z, int n,
             const LoaderOptions &options) {
   if (cdata->_ram_images.size() <= 1 && n == 0) {
-    // A special case for mipmap level 0.  When we load mipmap level
-    // 0, unless we already have mipmap levels, it determines the
-    // image properties like size and number of components.
+    // A special case for mipmap level 0.  When we load mipmap level 0, unless
+    // we already have mipmap levels, it determines the image properties like
+    // size and number of components.
     if (!do_reconsider_z_size(cdata, z, options)) {
       return false;
     }
@@ -3292,12 +3419,10 @@ do_load_one(CData *cdata, const PfmFile &pfm, const string &name, int z, int n,
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_load_sub_image
-//       Access: Protected, Virtual
-//  Description: Internal method to load an image into a section of
-//               a texture page or mipmap level.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to load an image into a section of a texture page or mipmap
+ * level.
+ */
 bool Texture::
 do_load_sub_image(CData *cdata, const PNMImage &image, int x, int y, int z, int n) {
   nassertr(n >= 0 && (size_t)n < cdata->_ram_images.size(), false);
@@ -3326,12 +3451,10 @@ do_load_sub_image(CData *cdata, const PNMImage &image, int x, int y, int z, int 
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_read_txo_file
-//       Access: Protected
-//  Description: Called internally when read() detects a txo file.
-//               Assumes the lock is already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called internally when read() detects a txo file.  Assumes the lock is
+ * already held.
+ */
 bool Texture::
 do_read_txo_file(CData *cdata, const Filename &fullpath) {
   VirtualFileSystem *vfs = VirtualFileSystem::get_global_ptr();
@@ -3361,11 +3484,9 @@ do_read_txo_file(CData *cdata, const Filename &fullpath) {
   return success;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_read_txo
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Texture::
 do_read_txo(CData *cdata, istream &in, const string &filename) {
   PT(Texture) other = make_from_txo(in, filename);
@@ -3385,12 +3506,10 @@ do_read_txo(CData *cdata, istream &in, const string &filename) {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_read_dds_file
-//       Access: Private
-//  Description: Called internally when read() detects a DDS file.
-//               Assumes the lock is already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called internally when read() detects a DDS file.  Assumes the lock is
+ * already held.
+ */
 bool Texture::
 do_read_dds_file(CData *cdata, const Filename &fullpath, bool header_only) {
   VirtualFileSystem *vfs = VirtualFileSystem::get_global_ptr();
@@ -3424,11 +3543,9 @@ do_read_dds_file(CData *cdata, const Filename &fullpath, bool header_only) {
   return success;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_read_dds
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Texture::
 do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only) {
   StreamReader dds(in);
@@ -3475,8 +3592,8 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
     header.num_levels = 1;
 
   } else if (header.num_levels == 0) {
-    // Some files seem to have this set to 0 for some reason--existing
-    // readers assume 0 means 1.
+    // Some files seem to have this set to 0 for some reason--existing readers
+    // assume 0 means 1.
     header.num_levels = 1;
   }
 
@@ -3511,11 +3628,196 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
   ReadDDSLevelFunc func = NULL;
 
   Format format = F_rgb;
+  ComponentType component_type = T_unsigned_byte;
 
   do_clear_ram_image(cdata);
   CompressionMode compression = CM_off;
 
-  if (header.pf.pf_flags & DDPF_FOURCC) {
+  if ((header.pf.pf_flags & DDPF_FOURCC) != 0 &&
+      header.pf.four_cc == 0x30315844) {   // 'DX10'
+    // A DirectX 10 style texture, which has an additional header.
+    func = read_dds_level_generic_uncompressed;
+    unsigned int format = dds.get_uint32();
+    unsigned int dimension = dds.get_uint32();
+    unsigned int misc_flag = dds.get_uint32();
+    unsigned int array_size = dds.get_uint32();
+    /*unsigned int alpha_mode = */dds.get_uint32();
+
+    switch (format) {
+    case 2:    // DXGI_FORMAT_R32G32B32A32_FLOAT
+      format = F_rgba32;
+      component_type = T_float;
+      func = read_dds_level_abgr32;
+      break;
+    case 10:   // DXGI_FORMAT_R16G16B16A16_FLOAT
+      format = F_rgba16;
+      component_type = T_half_float;
+      func = read_dds_level_abgr16;
+      break;
+    case 11:   // DXGI_FORMAT_R16G16B16A16_UNORM
+      format = F_rgba16;
+      component_type = T_unsigned_short;
+      func = read_dds_level_abgr16;
+      break;
+    case 27:   // DXGI_FORMAT_R8G8B8A8_TYPELESS
+    case 28:   // DXGI_FORMAT_R8G8B8A8_UNORM
+      format = F_rgba8;
+      func = read_dds_level_abgr8;
+      break;
+    case 29:   // DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
+      format = F_srgb_alpha;
+      func = read_dds_level_abgr8;
+      break;
+    case 30:   // DXGI_FORMAT_R8G8B8A8_UINT
+      format = F_rgba8i;
+      func = read_dds_level_abgr8;
+      break;
+    case 31:   // DXGI_FORMAT_R8G8B8A8_SNORM
+      format = F_rgba8;
+      component_type = T_byte;
+      func = read_dds_level_abgr8;
+      break;
+    case 32:   // DXGI_FORMAT_R8G8B8A8_SINT
+      format = F_rgba8i;
+      component_type = T_byte;
+      func = read_dds_level_abgr8;
+      break;
+    case 48:   // DXGI_FORMAT_R8G8_TYPELESS
+    case 49:   // DXGI_FORMAT_R8G8_UNORM
+      format = F_rg;
+      break;
+    case 50:   // DXGI_FORMAT_R8G8_UINT
+      format = F_rg8i;
+      break;
+    case 51:   // DXGI_FORMAT_R8G8_SNORM
+      format = F_rg;
+      component_type = T_byte;
+      break;
+    case 52:   // DXGI_FORMAT_R8G8_SINT
+      format = F_rg8i;
+      component_type = T_byte;
+      break;
+    case 60:   // DXGI_FORMAT_R8_TYPELESS
+    case 61:   // DXGI_FORMAT_R8_UNORM
+      format = F_red;
+      break;
+    case 62:   // DXGI_FORMAT_R8_UINT
+      format = F_r8i;
+      break;
+    case 63:   // DXGI_FORMAT_R8_SNORM
+      format = F_red;
+      component_type = T_byte;
+      break;
+    case 64:   // DXGI_FORMAT_R8_SINT
+      format = F_r8i;
+      component_type = T_byte;
+      break;
+    case 65:   // DXGI_FORMAT_A8_UNORM
+      format = F_alpha;
+      break;
+    case 70:   // DXGI_FORMAT_BC1_TYPELESS
+    case 71:   // DXGI_FORMAT_BC1_UNORM
+      format = F_rgb;
+      compression = CM_dxt1;
+      func = read_dds_level_bc1;
+      break;
+    case 72:   // DXGI_FORMAT_BC1_UNORM_SRGB
+      format = F_srgb;
+      compression = CM_dxt1;
+      func = read_dds_level_bc1;
+      break;
+    case 73:   // DXGI_FORMAT_BC2_TYPELESS
+    case 74:   // DXGI_FORMAT_BC2_UNORM
+      format = F_rgba;
+      compression = CM_dxt3;
+      func = read_dds_level_bc2;
+      break;
+    case 75:   // DXGI_FORMAT_BC2_UNORM_SRGB
+      format = F_srgb_alpha;
+      compression = CM_dxt3;
+      func = read_dds_level_bc2;
+      break;
+    case 76:   // DXGI_FORMAT_BC3_TYPELESS
+    case 77:   // DXGI_FORMAT_BC3_UNORM
+      format = F_rgba;
+      compression = CM_dxt5;
+      func = read_dds_level_bc3;
+      break;
+    case 78:   // DXGI_FORMAT_BC3_UNORM_SRGB
+      format = F_srgb_alpha;
+      compression = CM_dxt5;
+      func = read_dds_level_bc3;
+      break;
+    case 79:   // DXGI_FORMAT_BC4_TYPELESS
+    case 80:   // DXGI_FORMAT_BC4_UNORM
+      format = F_red;
+      compression = CM_rgtc;
+      func = read_dds_level_bc4;
+      break;
+      break;
+    case 82:   // DXGI_FORMAT_BC5_TYPELESS
+    case 83:   // DXGI_FORMAT_BC5_UNORM
+      format = F_rg;
+      compression = CM_rgtc;
+      func = read_dds_level_bc5;
+      break;
+    case 87:   // DXGI_FORMAT_B8G8R8A8_UNORM
+    case 90:   // DXGI_FORMAT_B8G8R8A8_TYPELESS
+      format = F_rgba8;
+      break;
+    case 88:   // DXGI_FORMAT_B8G8R8X8_UNORM
+    case 92:   // DXGI_FORMAT_B8G8R8X8_TYPELESS
+      format = F_rgb8;
+      break;
+    case 91:   // DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
+      format = F_srgb_alpha;
+      break;
+    case 93:   // DXGI_FORMAT_B8G8R8X8_UNORM_SRGB
+      format = F_srgb;
+      break;
+    case 115:  // DXGI_FORMAT_B4G4R4A4_UNORM
+      format = F_rgba4;
+      break;
+    default:
+      gobj_cat.error()
+        << filename << ": unsupported DXGI format " << format << ".\n";
+      return false;
+    }
+
+    switch (dimension) {
+    case 2:  // DDS_DIMENSION_TEXTURE1D
+      texture_type = TT_1d_texture;
+      header.depth = 1;
+      break;
+    case 3:  // DDS_DIMENSION_TEXTURE2D
+      if (misc_flag & 0x4) {  // DDS_RESOURCE_MISC_TEXTURECUBE
+        if (array_size > 1) {
+          texture_type = TT_cube_map_array;
+          header.depth = array_size * 6;
+        } else {
+          texture_type = TT_cube_map;
+          header.depth = 6;
+        }
+      } else {
+        if (array_size > 1) {
+          texture_type = TT_2d_texture_array;
+          header.depth = array_size;
+        } else {
+          texture_type = TT_2d_texture;
+          header.depth = 1;
+        }
+      }
+      break;
+    case 4:  // DDS_DIMENSION_TEXTURE3D
+      texture_type = TT_3d_texture;
+      break;
+    default:
+      gobj_cat.error()
+        << filename << ": unsupported dimension.\n";
+      return false;
+    }
+
+  } else if (header.pf.pf_flags & DDPF_FOURCC) {
     // Some compressed texture format.
     if (texture_type == TT_3d_texture) {
       gobj_cat.error()
@@ -3523,30 +3825,68 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
       return false;
     }
 
-    if (header.pf.four_cc == 0x31545844) {   // 'DXT1', little-endian.
+    // Most of the compressed formats support alpha.
+    format = F_rgba;
+    switch (header.pf.four_cc) {
+    case 0x31545844:   // 'DXT1', little-endian.
       compression = CM_dxt1;
-      func = read_dds_level_dxt1;
-    } else if (header.pf.four_cc == 0x32545844) {   // 'DXT2'
+      func = read_dds_level_bc1;
+      format = F_rgbm;
+      break;
+    case 0x32545844:   // 'DXT2'
       compression = CM_dxt2;
-      func = read_dds_level_dxt23;
-    } else if (header.pf.four_cc == 0x33545844) {   // 'DXT3'
+      func = read_dds_level_bc2;
+      break;
+    case 0x33545844:   // 'DXT3'
       compression = CM_dxt3;
-      func = read_dds_level_dxt23;
-    } else if (header.pf.four_cc == 0x34545844) {   // 'DXT4'
+      func = read_dds_level_bc2;
+      break;
+    case 0x34545844:   // 'DXT4'
       compression = CM_dxt4;
-      func = read_dds_level_dxt45;
-    } else if (header.pf.four_cc == 0x35545844) {   // 'DXT5'
+      func = read_dds_level_bc3;
+      break;
+    case 0x35545844:   // 'DXT5'
       compression = CM_dxt5;
-      func = read_dds_level_dxt45;
-    } else {
+      func = read_dds_level_bc3;
+      break;
+    case 0x31495441:   // 'ATI1'
+    case 0x55344342:   // 'BC4U'
+      compression = CM_rgtc;
+      func = read_dds_level_bc4;
+      format = F_red;
+      break;
+    case 0x32495441:   // 'ATI2'
+    case 0x55354342:   // 'BC5U'
+      compression = CM_rgtc;
+      func = read_dds_level_bc5;
+      format = F_rg;
+      break;
+    case 36:   // D3DFMT_A16B16G16R16
+      func = read_dds_level_abgr16;
+      format = F_rgba16;
+      component_type = T_unsigned_short;
+      break;
+    case 110:  // D3DFMT_Q16W16V16U16
+      func = read_dds_level_abgr16;
+      format = F_rgba16;
+      component_type = T_short;
+      break;
+    case 113:  // D3DFMT_A16B16G16R16F
+      func = read_dds_level_abgr16;
+      format = F_rgba16;
+      component_type = T_half_float;
+      break;
+    case 116:  // D3DFMT_A32B32G32R32F
+      func = read_dds_level_abgr32;
+      format = F_rgba32;
+      component_type = T_float;
+      break;
+    default:
       gobj_cat.error()
-        << filename << ": unsupported texture compression.\n";
+        << filename << ": unsupported texture compression (FourCC: 0x"
+        << hex << header.pf.four_cc << dec << ").\n";
       return false;
     }
-
-    // All of the compressed formats support alpha, even DXT1 (to some
-    // extent, at least).
-    format = F_rgba;
 
   } else {
     // An uncompressed texture format.
@@ -3597,7 +3937,7 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
   }
 
   do_setup_texture(cdata, texture_type, header.width, header.height, header.depth,
-                   T_unsigned_byte, format);
+                   component_type, format);
 
   cdata->_orig_file_x_size = cdata->_x_size;
   cdata->_orig_file_y_size = cdata->_y_size;
@@ -3608,8 +3948,8 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
     switch (texture_type) {
     case TT_3d_texture:
       {
-        // 3-d textures store all the depth slices for mipmap level 0,
-        // then all the depth slices for mipmap level 1, and so on.
+        // 3-d textures store all the depth slices for mipmap level 0, then
+        // all the depth slices for mipmap level 1, and so on.
         for (int n = 0; n < (int)header.num_levels; ++n) {
           int z_size = do_get_expected_mipmap_z_size(cdata, n);
           pvector<PTA_uchar> pages;
@@ -3624,9 +3964,9 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
             page_size = page.size();
             pages.push_back(page);
           }
-          // Now reassemble the pages into one big image.  Because
-          // this is a Microsoft format, the images are stacked in
-          // reverse order; re-reverse them.
+          // Now reassemble the pages into one big image.  Because this is a
+          // Microsoft format, the images are stacked in reverse order; re-
+          // reverse them.
           PTA_uchar image = PTA_uchar::empty_array(page_size * z_size);
           unsigned char *imagep = (unsigned char *)image.p();
           for (z = 0; z < z_size; ++z) {
@@ -3641,8 +3981,8 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
 
     case TT_cube_map:
       {
-        // Cube maps store all the mipmap levels for face 0, then all
-        // the mipmap levels for face 1, and so on.
+        // Cube maps store all the mipmap levels for face 0, then all the
+        // mipmap levels for face 1, and so on.
         pvector<pvector<PTA_uchar> > pages;
         pages.reserve(6);
         int z, n;
@@ -3660,9 +4000,9 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
           }
         }
 
-        // Now, for each level, reassemble the pages into one big
-        // image.  Because this is a Microsoft format, the levels are
-        // arranged in a rotated order.
+        // Now, for each level, reassemble the pages into one big image.
+        // Because this is a Microsoft format, the levels are arranged in a
+        // rotated order.
         static const int level_remap[6] = {
           0, 1, 5, 4, 2, 3
         };
@@ -3674,6 +4014,43 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
             int fz = level_remap[z];
             nassertr(pages[fz][n].size() == page_size, false);
             memcpy(imagep + z * page_size, pages[fz][n].p(), page_size);
+          }
+
+          do_set_ram_mipmap_image(cdata, n, image, page_size);
+        }
+      }
+      break;
+
+    case TT_2d_texture_array:
+    case TT_cube_map_array: //TODO: rearrange cube map array faces?
+      {
+        // Texture arrays store all the mipmap levels for layer 0, then all
+        // the mipmap levels for layer 1, and so on.
+        pvector<pvector<PTA_uchar> > pages;
+        pages.reserve(header.depth);
+        int z, n;
+        for (z = 0; z < (int)header.depth; ++z) {
+          pages.push_back(pvector<PTA_uchar>());
+          pvector<PTA_uchar> &levels = pages.back();
+          levels.reserve(header.num_levels);
+
+          for (n = 0; n < (int)header.num_levels; ++n) {
+            PTA_uchar image = func(this, cdata, header, n, in);
+            if (image.is_null()) {
+              return false;
+            }
+            levels.push_back(image);
+          }
+        }
+
+        // Now, for each level, reassemble the pages into one big image.
+        for (n = 0; n < (int)header.num_levels; ++n) {
+          size_t page_size = pages[0][n].size();
+          PTA_uchar image = PTA_uchar::empty_array(page_size * header.depth);
+          unsigned char *imagep = (unsigned char *)image.p();
+          for (z = 0; z < (int)header.depth; ++z) {
+            nassertr(pages[z][n].size() == page_size, false);
+            memcpy(imagep + z * page_size, pages[z][n].p(), page_size);
           }
 
           do_set_ram_mipmap_image(cdata, n, image, page_size);
@@ -3710,12 +4087,774 @@ do_read_dds(CData *cdata, istream &in, const string &filename, bool header_only)
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_write
-//       Access: Protected
-//  Description: Internal method to write a series of pages and/or
-//               mipmap levels to disk files.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called internally when read() detects a KTX file.  Assumes the lock is
+ * already held.
+ */
+bool Texture::
+do_read_ktx_file(CData *cdata, const Filename &fullpath, bool header_only) {
+  VirtualFileSystem *vfs = VirtualFileSystem::get_global_ptr();
+
+  Filename filename = Filename::binary_filename(fullpath);
+  PT(VirtualFile) file = vfs->get_file(filename);
+  if (file == (VirtualFile *)NULL) {
+    // No such file.
+    gobj_cat.error()
+      << "Could not find " << fullpath << "\n";
+    return false;
+  }
+
+  if (gobj_cat.is_debug()) {
+    gobj_cat.debug()
+      << "Reading KTX file " << filename << "\n";
+  }
+
+  istream *in = file->open_read_file(true);
+  bool success = do_read_ktx(cdata, *in, fullpath, header_only);
+  vfs->close_read_file(in);
+
+  if (!has_name()) {
+    set_name(fullpath.get_basename_wo_extension());
+  }
+
+  cdata->_fullpath = fullpath;
+  cdata->_alpha_fullpath = Filename();
+  cdata->_keep_ram_image = false;
+
+  return success;
+}
+
+/**
+ *
+ */
+bool Texture::
+do_read_ktx(CData *cdata, istream &in, const string &filename, bool header_only) {
+  StreamReader ktx(in);
+
+  if (ktx.extract_bytes(12) != "\xABKTX 11\xBB\r\n\x1A\n") {
+    gobj_cat.error()
+      << filename << " is not a KTX file.\n";
+    return false;
+  }
+
+  // See: https://www.khronos.org/opengles/sdk/tools/KTX/file_format_spec/
+  uint32_t gl_type, type_size, gl_format, internal_format, gl_base_format,
+    width, height, depth, num_array_elements, num_faces, num_mipmap_levels,
+    kvdata_size;
+
+  bool big_endian;
+  if (ktx.get_uint32() == 0x04030201) {
+    big_endian = false;
+    gl_type = ktx.get_uint32();
+    type_size = ktx.get_uint32();
+    gl_format = ktx.get_uint32();
+    internal_format = ktx.get_uint32();
+    gl_base_format = ktx.get_uint32();
+    width = ktx.get_uint32();
+    height = ktx.get_uint32();
+    depth = ktx.get_uint32();
+    num_array_elements = ktx.get_uint32();
+    num_faces = ktx.get_uint32();
+    num_mipmap_levels = ktx.get_uint32();
+    kvdata_size = ktx.get_uint32();
+  } else {
+    big_endian = true;
+    gl_type = ktx.get_be_uint32();
+    type_size = ktx.get_be_uint32();
+    gl_format = ktx.get_be_uint32();
+    internal_format = ktx.get_be_uint32();
+    gl_base_format = ktx.get_be_uint32();
+    width = ktx.get_be_uint32();
+    height = ktx.get_be_uint32();
+    depth = ktx.get_be_uint32();
+    num_array_elements = ktx.get_be_uint32();
+    num_faces = ktx.get_be_uint32();
+    num_mipmap_levels = ktx.get_be_uint32();
+    kvdata_size = ktx.get_be_uint32();
+  }
+
+  // Skip metadata section.
+  ktx.skip_bytes(kvdata_size);
+
+  ComponentType type;
+  CompressionMode compression;
+  Format format;
+  bool swap_bgr = false;
+
+  if (gl_type == 0 || gl_format == 0) {
+    // Compressed texture.
+    if (gl_type > 0 || gl_format > 0) {
+      gobj_cat.error()
+        << "Compressed textures must have both type and format set to 0.\n";
+      return false;
+    }
+    type = T_unsigned_byte;
+    compression = CM_on;
+
+    KTXFormat base_format;
+    switch ((KTXCompressedFormat)internal_format) {
+    case KTX_COMPRESSED_RED:
+      format = F_red;
+      base_format = KTX_RED;
+      break;
+    case KTX_COMPRESSED_RG:
+      format = F_rg;
+      base_format = KTX_RG;
+      break;
+    case KTX_COMPRESSED_RGB:
+      format = F_rgb;
+      base_format = KTX_RGB;
+      break;
+    case KTX_COMPRESSED_RGBA:
+      format = F_rgba;
+      base_format = KTX_RGBA;
+      break;
+    case KTX_COMPRESSED_SRGB:
+      format = F_srgb;
+      base_format = KTX_SRGB;
+      break;
+    case KTX_COMPRESSED_SRGB_ALPHA:
+      format = F_srgb_alpha;
+      base_format = KTX_SRGB_ALPHA;
+      break;
+    case KTX_COMPRESSED_RGB_FXT1_3DFX:
+      format = F_rgb;
+      base_format = KTX_RGB;
+      compression = CM_fxt1;
+      break;
+    case KTX_COMPRESSED_RGBA_FXT1_3DFX:
+      format = F_rgba;
+      base_format = KTX_RGBA;
+      compression = CM_fxt1;
+      break;
+    case KTX_COMPRESSED_RGB_S3TC_DXT1:
+      format = F_rgb;
+      base_format = KTX_RGB;
+      compression = CM_dxt1;
+      break;
+    case KTX_COMPRESSED_RGBA_S3TC_DXT1:
+      format = F_rgbm;
+      base_format = KTX_RGB;
+      compression = CM_dxt1;
+      break;
+    case KTX_COMPRESSED_RGBA_S3TC_DXT3:
+      format = F_rgba;
+      base_format = KTX_RGBA;
+      compression = CM_dxt3;
+      break;
+    case KTX_COMPRESSED_RGBA_S3TC_DXT5:
+      format = F_rgba;
+      base_format = KTX_RGBA;
+      compression = CM_dxt5;
+      break;
+    case KTX_COMPRESSED_SRGB_ALPHA_S3TC_DXT1:
+      format = F_srgb_alpha;
+      base_format = KTX_SRGB_ALPHA;
+      compression = CM_dxt1;
+      break;
+    case KTX_COMPRESSED_SRGB_ALPHA_S3TC_DXT3:
+      format = F_srgb_alpha;
+      base_format = KTX_SRGB_ALPHA;
+      compression = CM_dxt3;
+      break;
+    case KTX_COMPRESSED_SRGB_ALPHA_S3TC_DXT5:
+      format = F_srgb_alpha;
+      base_format = KTX_SRGB_ALPHA;
+      compression = CM_dxt5;
+      break;
+    case KTX_COMPRESSED_SRGB_S3TC_DXT1:
+      format = F_srgb;
+      base_format = KTX_SRGB;
+      compression = CM_dxt1;
+      break;
+    case KTX_COMPRESSED_RED_RGTC1:
+    case KTX_COMPRESSED_SIGNED_RED_RGTC1:
+      format = F_red;
+      base_format = KTX_RED;
+      compression = CM_rgtc;
+      break;
+    case KTX_COMPRESSED_RG_RGTC2:
+    case KTX_COMPRESSED_SIGNED_RG_RGTC2:
+      format = F_rg;
+      base_format = KTX_RG;
+      compression = CM_rgtc;
+      break;
+    case KTX_ETC1_RGB8:
+      format = F_rgb;
+      base_format = KTX_RGB;
+      compression = CM_etc1;
+      break;
+    case KTX_ETC1_SRGB8:
+      format = F_srgb;
+      base_format = KTX_SRGB;
+      compression = CM_etc1;
+      break;
+    case KTX_COMPRESSED_RGB8_ETC2:
+      format = F_rgb;
+      base_format = KTX_RGB;
+      compression = CM_etc2;
+      break;
+    case KTX_COMPRESSED_SRGB8_ETC2:
+      format = F_srgb;
+      base_format = KTX_SRGB;
+      compression = CM_etc2;
+      break;
+    case KTX_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2:
+      format = F_rgbm;
+      base_format = KTX_RGBA;
+      compression = CM_etc2;
+      break;
+    case KTX_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2:
+      format = F_rgbm;
+      base_format = KTX_SRGB8_ALPHA8;
+      compression = CM_etc2;
+      break;
+    case KTX_COMPRESSED_RGBA8_ETC2_EAC:
+      format = F_rgba;
+      base_format = KTX_RGBA;
+      compression = CM_etc2;
+      break;
+    case KTX_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC:
+      format = F_srgb_alpha;
+      base_format = KTX_SRGB8_ALPHA8;
+      compression = CM_etc2;
+      break;
+    case KTX_COMPRESSED_R11_EAC:
+    case KTX_COMPRESSED_SIGNED_R11_EAC:
+      format = F_red;
+      base_format = KTX_RED;
+      compression = CM_eac;
+      break;
+    case KTX_COMPRESSED_RG11_EAC:
+    case KTX_COMPRESSED_SIGNED_RG11_EAC:
+      format = F_rg;
+      base_format = KTX_RG;
+      compression = CM_eac;
+      break;
+    case KTX_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV1:
+      format = F_srgb_alpha;
+      base_format = KTX_SRGB_ALPHA;
+      compression = CM_pvr1_2bpp;
+      break;
+    case KTX_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1:
+      format = F_srgb_alpha;
+      base_format = KTX_SRGB_ALPHA;
+      compression = CM_pvr1_4bpp;
+      break;
+    case KTX_COMPRESSED_RGBA_BPTC_UNORM:
+    case KTX_COMPRESSED_SRGB_ALPHA_BPTC_UNORM:
+    case KTX_COMPRESSED_RGB_BPTC_SIGNED_FLOAT:
+    case KTX_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT:
+    default:
+      gobj_cat.error()
+        << filename << " has unsupported compressed internal format " << internal_format << "\n";
+      return false;
+    }
+
+    if (base_format != gl_base_format) {
+      gobj_cat.error()
+        << filename << " has internal format that is incompatible with base "
+           "format (0x" << hex << gl_base_format << ", expected 0x"
+        << base_format << dec << ")\n";
+      return false;
+    }
+
+  } else {
+    // Uncompressed texture.
+    compression = CM_off;
+    switch ((KTXType)gl_type) {
+    case KTX_BYTE:
+      type = T_byte;
+      break;
+    case KTX_UNSIGNED_BYTE:
+      type = T_unsigned_byte;
+      break;
+    case KTX_SHORT:
+      type = T_short;
+      break;
+    case KTX_UNSIGNED_SHORT:
+      type = T_unsigned_short;
+      break;
+    case KTX_INT:
+      type = T_int;
+      break;
+    case KTX_UNSIGNED_INT:
+      type = T_unsigned_int;
+      break;
+    case KTX_FLOAT:
+      type = T_float;
+      break;
+    case KTX_HALF_FLOAT:
+      type = T_half_float;
+      break;
+    case KTX_UNSIGNED_INT_24_8:
+      type = T_unsigned_int_24_8;
+      break;
+    default:
+      gobj_cat.error()
+        << filename << " has unsupported component type " << gl_type << "\n";
+      return false;
+    }
+
+    if (gl_format != gl_base_format) {
+      gobj_cat.error()
+        << filename << " has mismatched formats: " << gl_format << " != "
+        << gl_base_format << "\n";
+    }
+
+    switch (gl_format) {
+    case KTX_DEPTH_COMPONENT:
+      switch (internal_format) {
+      case KTX_DEPTH_COMPONENT:
+        format = F_depth_component;
+        break;
+      case KTX_DEPTH_COMPONENT16:
+        format = F_depth_component16;
+        break;
+      case KTX_DEPTH_COMPONENT24:
+        format = F_depth_component24;
+        break;
+      case KTX_DEPTH_COMPONENT32:
+      case KTX_DEPTH_COMPONENT32F:
+        format = F_depth_component32;
+        break;
+      default:
+        format = F_depth_component;
+        gobj_cat.warning()
+          << filename << " has unsupported depth component format " << internal_format << "\n";
+      }
+      break;
+
+    case KTX_DEPTH_STENCIL:
+      format = F_depth_stencil;
+      if (internal_format != KTX_DEPTH_STENCIL &&
+          internal_format != KTX_DEPTH24_STENCIL8) {
+        gobj_cat.warning()
+          << filename << " has unsupported depth stencil format " << internal_format << "\n";
+      }
+      break;
+
+    case KTX_RED:
+      switch (internal_format) {
+      case KTX_RED:
+      case KTX_RED_SNORM:
+      case KTX_R8:
+      case KTX_R8_SNORM:
+        format = F_red;
+        break;
+      case KTX_R16:
+      case KTX_R16_SNORM:
+      case KTX_R16F:
+        format = F_r16;
+        break;
+      case KTX_R32F:
+        format = F_r32;
+        break;
+      default:
+        format = F_red;
+        gobj_cat.warning()
+          << filename << " has unsupported red format " << internal_format << "\n";
+      }
+      break;
+
+    case KTX_RED_INTEGER:
+      switch (internal_format) {
+      case KTX_R8I:
+      case KTX_R8UI:
+        format = F_r8i;
+        break;
+      case KTX_R16I:
+      case KTX_R16UI:
+        format = F_r16i;
+        break;
+      case KTX_R32I:
+      case KTX_R32UI:
+        format = F_r32i;
+        break;
+      default:
+        gobj_cat.error()
+          << filename << " has unsupported red integer format " << internal_format << "\n";
+        return false;
+      }
+      break;
+
+    case KTX_GREEN:
+      format = F_green;
+      if (internal_format != KTX_GREEN) {
+        gobj_cat.warning()
+          << filename << " has unsupported green format " << internal_format << "\n";
+      }
+      break;
+
+    case KTX_BLUE:
+      format = F_blue;
+      if (internal_format != KTX_BLUE) {
+        gobj_cat.warning()
+          << filename << " has unsupported blue format " << internal_format << "\n";
+      }
+      break;
+
+    case KTX_RG:
+      switch (internal_format) {
+      case KTX_RG:
+      case KTX_RG_SNORM:
+      case KTX_RG8:
+      case KTX_RG8_SNORM:
+        format = F_rg;
+        break;
+      case KTX_RG16:
+      case KTX_RG16_SNORM:
+      case KTX_RG16F:
+        format = F_rg16;
+        break;
+      case KTX_RG32F:
+        format = F_rg32;
+        break;
+      default:
+        format = F_rg;
+        gobj_cat.warning()
+          << filename << " has unsupported RG format " << internal_format << "\n";
+      }
+      break;
+
+    case KTX_RG_INTEGER:
+      switch (internal_format) {
+      case KTX_RG8I:
+      case KTX_RG8UI:
+        format = F_rg8i;
+        break;
+      case KTX_RG16I:
+      case KTX_RG16UI:
+      case KTX_RG32I:
+      case KTX_RG32UI:
+      default:
+        gobj_cat.error()
+          << filename << " has unsupported RG integer format " << internal_format << "\n";
+        return false;
+      }
+      break;
+
+    case KTX_RGB:
+      swap_bgr = true;
+    case KTX_BGR:
+      switch (internal_format) {
+      case KTX_RGB:
+      case KTX_RGB_SNORM:
+        format = F_rgb;
+        break;
+      case KTX_RGB5:
+        format = F_rgb5;
+        break;
+      case KTX_RGB12:
+        format = F_rgb12;
+        break;
+      case KTX_R3_G3_B2:
+        format = F_rgb332;
+        break;
+      case KTX_RGB9_E5:
+        format = F_rgb9_e5;
+        break;
+      case KTX_R11F_G11F_B10F:
+        format = F_r11_g11_b10;
+        break;
+      case KTX_RGB8:
+      case KTX_RGB8_SNORM:
+        format = F_rgb8;
+        break;
+      case KTX_RGB16:
+      case KTX_RGB16_SNORM:
+      case KTX_RGB16F:
+        format = F_rgb16;
+        break;
+      case KTX_RGB32F:
+        format = F_rgb32;
+        break;
+      case KTX_SRGB:
+      case KTX_SRGB8:
+        format = F_srgb;
+        break;
+      default:
+        format = F_rgb;
+        gobj_cat.warning()
+          << filename << " has unsupported RGB format " << internal_format << "\n";
+      }
+      break;
+
+    case KTX_RGB_INTEGER:
+      swap_bgr = true;
+    case KTX_BGR_INTEGER:
+      switch (internal_format) {
+      case KTX_RGB8I:
+      case KTX_RGB8UI:
+        format = F_rgb8i;
+        break;
+      case KTX_RGB16I:
+      case KTX_RGB16UI:
+      case KTX_RGB32I:
+      case KTX_RGB32UI:
+      default:
+        gobj_cat.error()
+          << filename << " has unsupported RGB integer format " << internal_format << "\n";
+        return false;
+      }
+      break;
+
+    case KTX_RGBA:
+      swap_bgr = true;
+    case KTX_BGRA:
+      switch (internal_format) {
+      case KTX_RGBA:
+      case KTX_RGBA_SNORM:
+        format = F_rgba;
+        break;
+      case KTX_RGBA4:
+        format = F_rgba4;
+        break;
+      case KTX_RGB5_A1:
+        format = F_rgba5;
+        break;
+      case KTX_RGBA12:
+        format = F_rgba12;
+        break;
+      case KTX_RGB10_A2:
+        format = F_rgb10_a2;
+        break;
+      case KTX_RGBA8:
+      case KTX_RGBA8_SNORM:
+        format = F_rgba8;
+        break;
+      case KTX_RGBA16:
+      case KTX_RGBA16_SNORM:
+      case KTX_RGBA16F:
+        format = F_rgba16;
+        break;
+      case KTX_RGBA32F:
+        format = F_rgba32;
+        break;
+      case KTX_SRGB_ALPHA:
+      case KTX_SRGB8_ALPHA8:
+        format = F_srgb_alpha;
+        break;
+      default:
+        format = F_rgba;
+        gobj_cat.warning()
+          << filename << " has unsupported RGBA format " << internal_format << "\n";
+      }
+      break;
+      break;
+
+    case KTX_RGBA_INTEGER:
+      swap_bgr = true;
+    case KTX_BGRA_INTEGER:
+      switch (internal_format) {
+      case KTX_RGBA8I:
+      case KTX_RGBA8UI:
+        format = F_rgba8i;
+        break;
+      case KTX_RGBA16I:
+      case KTX_RGBA16UI:
+      case KTX_RGBA32I:
+      case KTX_RGBA32UI:
+      default:
+        gobj_cat.error()
+          << filename << " has unsupported RGBA integer format " << internal_format << "\n";
+        return false;
+      }
+      break;
+
+    case KTX_LUMINANCE:
+      format = F_luminance;
+      break;
+
+    case KTX_LUMINANCE_ALPHA:
+      format = F_luminance_alpha;
+      break;
+
+    case KTX_ALPHA:
+      format = F_alpha;
+      break;
+
+    case KTX_STENCIL_INDEX:
+    default:
+      gobj_cat.error()
+        << filename << " has unsupported format " << gl_format << "\n";
+      return false;
+    }
+  }
+
+  TextureType texture_type;
+  if (depth > 0) {
+    texture_type = TT_3d_texture;
+
+  } else if (num_faces > 1) {
+    if (num_faces != 6) {
+      gobj_cat.error()
+        << filename << " has " << num_faces << " cube map faces, expected 6\n";
+      return false;
+    }
+    if (width != height) {
+      gobj_cat.error()
+        << filename << " is cube map, but does not have square dimensions\n";
+      return false;
+    }
+    if (num_array_elements > 0) {
+      depth = num_array_elements * 6;
+      texture_type = TT_cube_map_array;
+    } else {
+      depth = 6;
+      texture_type = TT_cube_map;
+    }
+
+  } else if (height > 0) {
+    if (num_array_elements > 0) {
+      depth = num_array_elements;
+      texture_type = TT_2d_texture_array;
+    } else {
+      depth = 1;
+      texture_type = TT_2d_texture;
+    }
+
+  } else if (width > 0) {
+    depth = 1;
+    if (num_array_elements > 0) {
+      height = num_array_elements;
+      texture_type = TT_1d_texture_array;
+    } else {
+      height = 1;
+      texture_type = TT_1d_texture;
+    }
+
+  } else {
+    gobj_cat.error()
+      << filename << " has zero size\n";
+    return false;
+  }
+
+  do_setup_texture(cdata, texture_type, width, height, depth, type, format);
+
+  cdata->_orig_file_x_size = cdata->_x_size;
+  cdata->_orig_file_y_size = cdata->_y_size;
+  cdata->_compression = compression;
+  cdata->_ram_image_compression = compression;
+
+  if (!header_only) {
+    bool generate_mipmaps = false;
+    if (num_mipmap_levels == 0) {
+      generate_mipmaps = true;
+      num_mipmap_levels = 1;
+    }
+
+    for (uint32_t n = 0; n < num_mipmap_levels; ++n) {
+      uint32_t image_size;
+      if (big_endian) {
+        image_size = ktx.get_be_uint32();
+      } else {
+        image_size = ktx.get_uint32();
+      }
+      PTA_uchar image;
+
+      if (compression == CM_off) {
+        uint32_t row_size = do_get_expected_mipmap_x_size(cdata, (int)n) * cdata->_num_components * cdata->_component_width;
+        uint32_t num_rows = do_get_expected_mipmap_y_size(cdata, (int)n) * do_get_expected_mipmap_z_size(cdata, (int)n);
+        uint32_t row_padded = (row_size + 3) & ~3;
+
+        if (image_size == row_size * num_rows) {
+          if (row_padded != row_size) {
+            // Someone tightly packed the image.  This is invalid, but because
+            // we like it tightly packed too, we'll read it anyway.
+            gobj_cat.warning()
+              << filename << " does not have proper row padding for mipmap "
+                             "level " << n << "\n";
+          }
+          image = PTA_uchar::empty_array(image_size);
+          ktx.extract_bytes(image.p(), image_size);
+
+        } else if (image_size != row_padded * num_rows) {
+          gobj_cat.error()
+            << filename << " has invalid image size " << image_size
+            << " for mipmap level " << n << " (expected "
+            << row_padded * num_rows << ")\n";
+          return false;
+
+        } else {
+          // Read it row by row.
+          image = PTA_uchar::empty_array(row_size * num_rows);
+          uint32_t skip = row_padded - row_size;
+          unsigned char *p = image.p();
+          for (uint32_t row = 0; row < num_rows; ++row) {
+            ktx.extract_bytes(p, row_size);
+            ktx.skip_bytes(skip);
+            p += row_size;
+          }
+        }
+
+        // Swap red and blue channels if necessary to match Panda conventions.
+        if (swap_bgr) {
+          unsigned char *begin = image.p();
+          const unsigned char *end = image.p() + image.size();
+          size_t skip = cdata->_num_components;
+          nassertr(skip == 3 || skip == 4, false);
+
+          switch (cdata->_component_width) {
+          case 1:
+            for (unsigned char *p = begin; p < end; p += skip) {
+              swap(p[0], p[2]);
+            }
+            break;
+          case 2:
+            for (short *p = (short *)begin; p < (short *)end; p += skip) {
+              swap(p[0], p[2]);
+            }
+            break;
+          case 4:
+            for (int *p = (int *)begin; p < (int *)end; p += skip) {
+              swap(p[0], p[2]);
+            }
+            break;
+          default:
+            nassertr(false, false);
+            break;
+          }
+        }
+
+        do_set_ram_mipmap_image(cdata, (int)n, MOVE(image),
+          row_size * do_get_expected_mipmap_y_size(cdata, (int)n));
+
+      } else {
+        // Compressed image.  We'll trust that the file has the right size.
+        image = PTA_uchar::empty_array(image_size);
+        ktx.extract_bytes(image.p(), image_size);
+        do_set_ram_mipmap_image(cdata, (int)n, MOVE(image), image_size / depth);
+      }
+
+      ktx.skip_bytes(3 - ((image_size + 3) & 3));
+    }
+
+    cdata->_has_read_pages = true;
+    cdata->_has_read_mipmaps = true;
+    cdata->_num_mipmap_levels_read = cdata->_ram_images.size();
+
+    if (generate_mipmaps) {
+      do_generate_ram_mipmap_images(cdata, false);
+    }
+  }
+
+  if (in.fail() || in.eof()) {
+    gobj_cat.error()
+      << filename << ": truncated KTX file.\n";
+    return false;
+  }
+
+  cdata->_loaded_from_image = true;
+  cdata->_loaded_from_txo = true;
+
+  return true;
+}
+
+/**
+ * Internal method to write a series of pages and/or mipmap levels to disk
+ * files.
+ */
 bool Texture::
 do_write(CData *cdata,
          const Filename &fullpath, int z, int n, bool write_pages, bool write_mipmaps) {
@@ -3802,12 +4941,10 @@ do_write(CData *cdata,
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_write_one
-//       Access: Protected
-//  Description: Internal method to write the indicated page and
-//               mipmap level to a disk image file.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to write the indicated page and mipmap level to a disk
+ * image file.
+ */
 bool Texture::
 do_write_one(CData *cdata, const Filename &fullpath, int z, int n) {
   if (!do_has_ram_mipmap_image(cdata, n)) {
@@ -3842,12 +4979,9 @@ do_write_one(CData *cdata, const Filename &fullpath, int z, int n) {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_store_one
-//       Access: Protected
-//  Description: Internal method to copy a page and/or mipmap level to
-//               a PNMImage.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to copy a page and/or mipmap level to a PNMImage.
+ */
 bool Texture::
 do_store_one(CData *cdata, PNMImage &pnmimage, int z, int n) {
   // First, reload the ram image if necessary.
@@ -3883,12 +5017,9 @@ do_store_one(CData *cdata, PNMImage &pnmimage, int z, int n) {
                              do_get_ram_mipmap_page_size(cdata, n), z);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_store_one
-//       Access: Protected
-//  Description: Internal method to copy a page and/or mipmap level to
-//               a PfmFile.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to copy a page and/or mipmap level to a PfmFile.
+ */
 bool Texture::
 do_store_one(CData *cdata, PfmFile &pfm, int z, int n) {
   // First, reload the ram image if necessary.
@@ -3924,12 +5055,9 @@ do_store_one(CData *cdata, PfmFile &pfm, int z, int n) {
                         do_get_ram_mipmap_page_size(cdata, n), z);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_write_txo_file
-//       Access: Private
-//  Description: Called internally when write() detects a txo
-//               filename.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called internally when write() detects a txo filename.
+ */
 bool Texture::
 do_write_txo_file(const CData *cdata, const Filename &fullpath) const {
   VirtualFileSystem *vfs = VirtualFileSystem::get_global_ptr();
@@ -3946,11 +5074,9 @@ do_write_txo_file(const CData *cdata, const Filename &fullpath) const {
   return success;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_write_txo
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Texture::
 do_write_txo(const CData *cdata, ostream &out, const string &filename) const {
   DatagramOutputFile dout;
@@ -3987,32 +5113,26 @@ do_write_txo(const CData *cdata, ostream &out, const string &filename) const {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::unlocked_ensure_ram_image
-//       Access: Protected, Virtual
-//  Description: If the texture has a ram image already, this acquires
-//               the CData write lock and returns it.
-//
-//               If the texture lacks a ram image, this performs
-//               do_reload_ram_image(), but without holding the lock
-//               on this particular Texture object, to avoid holding
-//               the lock across what might be a slow operation.
-//               Instead, the reload is performed in a copy of the
-//               texture object, and then the lock is acquired and the
-//               data is copied in.
-//
-//               In any case, the return value is a locked CData
-//               object, which must be released with an explicit call
-//               to release_write().  The CData object will have a ram
-//               image unless for some reason do_reload_ram_image()
-//               fails.
-////////////////////////////////////////////////////////////////////
+/**
+ * If the texture has a ram image already, this acquires the CData write lock
+ * and returns it.
+ *
+ * If the texture lacks a ram image, this performs do_reload_ram_image(), but
+ * without holding the lock on this particular Texture object, to avoid
+ * holding the lock across what might be a slow operation.  Instead, the
+ * reload is performed in a copy of the texture object, and then the lock is
+ * acquired and the data is copied in.
+ *
+ * In any case, the return value is a locked CData object, which must be
+ * released with an explicit call to release_write().  The CData object will
+ * have a ram image unless for some reason do_reload_ram_image() fails.
+ */
 Texture::CData *Texture::
 unlocked_ensure_ram_image(bool allow_compression) {
   Thread *current_thread = Thread::get_current_thread();
 
-  // First, wait for any other threads that might be simultaneously
-  // performing the same operation.
+  // First, wait for any other threads that might be simultaneously performing
+  // the same operation.
   MutexHolder holder(_lock);
   while (_reloading) {
     _cvar.wait();
@@ -4022,13 +5142,13 @@ unlocked_ensure_ram_image(bool allow_compression) {
   const CData *cdata = _cycler.read(current_thread);
   bool has_ram_image = do_has_ram_image(cdata);
   if (has_ram_image && !allow_compression && cdata->_ram_image_compression != Texture::CM_off) {
-    // If we don't want compression, but the ram image we have is
-    // pre-compressed, we don't consider it.
+    // If we don't want compression, but the ram image we have is pre-
+    // compressed, we don't consider it.
     has_ram_image = false;
   }
   if (has_ram_image || !do_can_reload(cdata)) {
-    // We don't need to reload after all, or maybe we can't reload
-    // anyway.  Return, but elevate the lock first, as we promised.
+    // We don't need to reload after all, or maybe we can't reload anyway.
+    // Return, but elevate the lock first, as we promised.
     return _cycler.elevate_read_upstream(cdata, false, current_thread);
   }
 
@@ -4040,8 +5160,8 @@ unlocked_ensure_ram_image(bool allow_compression) {
   _cycler.release_read(cdata);
   _lock.release();
 
-  // Perform the actual reload in a copy of the texture, while our
-  // own mutex is left unlocked.
+  // Perform the actual reload in a copy of the texture, while our own mutex
+  // is left unlocked.
   CDWriter cdata_tex(tex->_cycler, true);
   tex->do_reload_ram_image(cdata_tex, allow_compression);
 
@@ -4049,17 +5169,16 @@ unlocked_ensure_ram_image(bool allow_compression) {
 
   CData *cdataw = _cycler.write_upstream(false, current_thread);
 
-  // Rather than calling do_assign(), which would copy *all* of the
-  // reloaded texture's properties over, we only copy in the ones
-  // which are relevant to the ram image.  This way, if the
-  // properties have changed during the reload (for instance,
-  // because we reloaded a txo), it won't contaminate the original
-  // texture.
+  // Rather than calling do_assign(), which would copy *all* of the reloaded
+  // texture's properties over, we only copy in the ones which are relevant to
+  // the ram image.  This way, if the properties have changed during the
+  // reload (for instance, because we reloaded a txo), it won't contaminate
+  // the original texture.
   cdataw->_orig_file_x_size = cdata_tex->_orig_file_x_size;
   cdataw->_orig_file_y_size = cdata_tex->_orig_file_y_size;
 
-  // If any of *these* properties have changed, the texture has
-  // changed in some fundamental way.  Update it appropriately.
+  // If any of *these* properties have changed, the texture has changed in
+  // some fundamental way.  Update it appropriately.
   if (cdata_tex->_x_size != cdataw->_x_size ||
       cdata_tex->_y_size != cdataw->_y_size ||
       cdata_tex->_z_size != cdataw->_z_size ||
@@ -4092,8 +5211,8 @@ unlocked_ensure_ram_image(bool allow_compression) {
   _reloading = false;
 
   // We don't generally increment the cdata->_image_modified semaphore,
-  // because this is just a reload, and presumably the image hasn't
-  // changed (unless we hit the if condition above).
+  // because this is just a reload, and presumably the image hasn't changed
+  // (unless we hit the if condition above).
 
   _cvar.notify_all();
 
@@ -4101,17 +5220,14 @@ unlocked_ensure_ram_image(bool allow_compression) {
   return cdataw;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_reload_ram_image
-//       Access: Protected, Virtual
-//  Description: Called when the Texture image is required but the ram
-//               image is not available, this will reload it from disk
-//               or otherwise do whatever is required to make it
-//               available, if possible.
-//
-//               Assumes the lock is already held.  The lock will be
-//               held during the duration of this operation.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called when the Texture image is required but the ram image is not
+ * available, this will reload it from disk or otherwise do whatever is
+ * required to make it available, if possible.
+ *
+ * Assumes the lock is already held.  The lock will be held during the
+ * duration of this operation.
+ */
 void Texture::
 do_reload_ram_image(CData *cdata, bool allow_compression) {
   BamCache *cache = BamCache::get_global_ptr();
@@ -4122,16 +5238,15 @@ do_reload_ram_image(CData *cdata, bool allow_compression) {
   }
 
   if ((cache->get_cache_textures() || (allow_compression && cache->get_cache_compressed_textures())) && !textures_header_only) {
-    // See if the texture can be found in the on-disk cache, if it is
-    // active.
+    // See if the texture can be found in the on-disk cache, if it is active.
 
     record = cache->lookup(cdata->_fullpath, "txo");
     if (record != (BamCacheRecord *)NULL &&
         record->has_data()) {
       PT(Texture) tex = DCAST(Texture, record->get_data());
 
-      // But don't use the cache record if the config parameters have
-      // changed, and we want a different-sized texture now.
+      // But don't use the cache record if the config parameters have changed,
+      // and we want a different-sized texture now.
       int x_size = cdata->_orig_file_x_size;
       int y_size = cdata->_orig_file_y_size;
       do_adjust_this_size(cdata, x_size, y_size, cdata->_filename.get_basename(), true);
@@ -4144,8 +5259,8 @@ do_reload_ram_image(CData *cdata, bool allow_compression) {
             << "; ignoring cache.\n";
         }
       } else {
-        // Also don't keep the cached version if it's compressed but
-        // we want uncompressed.
+        // Also don't keep the cached version if it's compressed but we want
+        // uncompressed.
         if (!allow_compression && tex->get_ram_image_compression() != Texture::CM_off) {
           if (gobj_cat.is_debug()) {
             gobj_cat.debug()
@@ -4156,9 +5271,9 @@ do_reload_ram_image(CData *cdata, bool allow_compression) {
           gobj_cat.info()
             << "Texture " << get_name() << " reloaded from disk cache\n";
           // We don't want to replace all the texture parameters--for
-          // instance, we don't want to change the filter type or the
-          // border color or anything--we just want to get the image and
-          // necessary associated parameters.
+          // instance, we don't want to change the filter type or the border
+          // color or anything--we just want to get the image and necessary
+          // associated parameters.
           CDReader cdata_tex(tex->_cycler);
           cdata->_x_size = cdata_tex->_x_size;
           cdata->_y_size = cdata_tex->_y_size;
@@ -4178,8 +5293,8 @@ do_reload_ram_image(CData *cdata, bool allow_compression) {
             if (!was_compressed && is_compressed &&
                 cache->get_cache_compressed_textures()) {
               // We've re-compressed the image after loading it from the
-              // cache.  To keep the cache current, rewrite it to the
-              // cache now, in its newly compressed form.
+              // cache.  To keep the cache current, rewrite it to the cache
+              // now, in its newly compressed form.
               record->set_data(this, this);
               cache->store(record);
             }
@@ -4209,14 +5324,19 @@ do_reload_ram_image(CData *cdata, bool allow_compression) {
   int orig_num_components = cdata->_num_components;
 
   LoaderOptions options;
-  options.set_texture_flags(LoaderOptions::TF_preload);
+  if (allow_compression) {
+    options.set_texture_flags(LoaderOptions::TF_preload |
+                              LoaderOptions::TF_allow_compression);
+  } else {
+    options.set_texture_flags(LoaderOptions::TF_preload);
+  }
   do_read(cdata, cdata->_fullpath, cdata->_alpha_fullpath,
           cdata->_primary_file_num_channels, cdata->_alpha_file_channel,
           z, n, cdata->_has_read_pages, cdata->_has_read_mipmaps, options, NULL);
 
   if (orig_num_components == cdata->_num_components) {
-    // Restore the original format, in case it was needlessly changed
-    // during the reload operation.
+    // Restore the original format, in case it was needlessly changed during
+    // the reload operation.
     cdata->_format = orig_format;
   }
 
@@ -4232,12 +5352,10 @@ do_reload_ram_image(CData *cdata, bool allow_compression) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_modify_ram_image
-//       Access: Protected
-//  Description: This is called internally to uniquify the ram image
-//               pointer without updating cdata->_image_modified.
-////////////////////////////////////////////////////////////////////
+/**
+ * This is called internally to uniquify the ram image pointer without
+ * updating cdata->_image_modified.
+ */
 PTA_uchar Texture::
 do_modify_ram_image(CData *cdata) {
   if (cdata->_ram_images.empty() || cdata->_ram_images[0]._image.empty() ||
@@ -4249,12 +5367,10 @@ do_modify_ram_image(CData *cdata) {
   return cdata->_ram_images[0]._image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_make_ram_image
-//       Access: Protected
-//  Description: This is called internally to make a new ram image
-//               without updating cdata->_image_modified.
-////////////////////////////////////////////////////////////////////
+/**
+ * This is called internally to make a new ram image without updating
+ * cdata->_image_modified.
+ */
 PTA_uchar Texture::
 do_make_ram_image(CData *cdata) {
   int image_size = do_get_expected_ram_image_size(cdata);
@@ -4280,16 +5396,13 @@ do_make_ram_image(CData *cdata) {
   return cdata->_ram_images[0]._image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_ram_image
-//       Access: Protected
-//  Description: Replaces the current system-RAM image with the new
-//               data.  If compression is not CM_off, it indicates
-//               that the new data is already pre-compressed in the
-//               indicated format.
-//
-//               This does *not* affect keep_ram_image.
-////////////////////////////////////////////////////////////////////
+/**
+ * Replaces the current system-RAM image with the new data.  If compression is
+ * not CM_off, it indicates that the new data is already pre-compressed in the
+ * indicated format.
+ *
+ * This does *not* affect keep_ram_image.
+ */
 void Texture::
 do_set_ram_image(CData *cdata, CPTA_uchar image, Texture::CompressionMode compression,
                  size_t page_size) {
@@ -4314,12 +5427,10 @@ do_set_ram_image(CData *cdata, CPTA_uchar image, Texture::CompressionMode compre
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_modify_ram_mipmap_image
-//       Access: Protected
-//  Description: This is called internally to uniquify the nth mipmap
-//               image pointer without updating cdata->_image_modified.
-////////////////////////////////////////////////////////////////////
+/**
+ * This is called internally to uniquify the nth mipmap image pointer without
+ * updating cdata->_image_modified.
+ */
 PTA_uchar Texture::
 do_modify_ram_mipmap_image(CData *cdata, int n) {
   nassertr(cdata->_ram_image_compression == CM_off, PTA_uchar());
@@ -4331,11 +5442,9 @@ do_modify_ram_mipmap_image(CData *cdata, int n) {
   return cdata->_ram_images[n]._image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_make_ram_mipmap_image
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 PTA_uchar Texture::
 do_make_ram_mipmap_image(CData *cdata, int n) {
   nassertr(cdata->_ram_image_compression == CM_off, PTA_uchar(get_class_type()));
@@ -4364,11 +5473,9 @@ do_make_ram_mipmap_image(CData *cdata, int n) {
   return cdata->_ram_images[n]._image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_ram_mipmap_image
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_ram_mipmap_image(CData *cdata, int n, CPTA_uchar image, size_t page_size) {
   nassertv(cdata->_ram_image_compression != CM_off || image.size() == do_get_expected_ram_mipmap_image_size(cdata, n));
@@ -4389,24 +5496,19 @@ do_set_ram_mipmap_image(CData *cdata, int n, CPTA_uchar image, size_t page_size)
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_get_clear_color
-//       Access: Published
-//  Description: Returns a string with a single pixel representing
-//               the clear color of the texture in the format of
-//               this texture.
-//
-//               In other words, to create an uncompressed RAM
-//               texture filled with the clear color, it should
-//               be initialized with this string repeated for
-//               every pixel.
-////////////////////////////////////////////////////////////////////
-int Texture::
+/**
+ * Returns a string with a single pixel representing the clear color of the
+ * texture in the format of this texture.
+ *
+ * In other words, to create an uncompressed RAM texture filled with the clear
+ * color, it should be initialized with this string repeated for every pixel.
+ */
+size_t Texture::
 do_get_clear_data(const CData *cdata, unsigned char *into) const {
   nassertr(cdata->_has_clear_color, 0);
   nassertr(cdata->_num_components <= 4, 0);
 
-  //TODO: encode the color into the sRGB color space if used
+  // TODO: encode the color into the sRGB color space if used
   switch (cdata->_component_type) {
   case T_unsigned_byte:
     {
@@ -4476,8 +5578,8 @@ do_get_clear_data(const CData *cdata, unsigned char *into) const {
 
   case T_int:
     {
-      // Note: there are no 32-bit UNORM textures.  Therefore, we don't
-      // do any normalization here, either.
+      // Note: there are no 32-bit UNORM textures.  Therefore, we don't do any
+      // normalization here, either.
       switch (cdata->_num_components) {
       case 2:
         ((int *)into)[1] = (int)cdata->_clear_color[1];
@@ -4494,37 +5596,94 @@ do_get_clear_data(const CData *cdata, unsigned char *into) const {
       }
       break;
     }
+
+  case T_byte:
+    {
+      LColor scaled = cdata->_clear_color.fmin(LColor(1)).fmax(LColor(-1));
+      scaled *= 127;
+      switch (cdata->_num_components) {
+      case 2:
+        into[1] = (char)scaled[1];
+      case 1:
+        into[0] = (char)scaled[0];
+        break;
+      case 4:
+        into[3] = (char)scaled[3];
+      case 3: // BGR <-> RGB
+        into[0] = (char)scaled[2];
+        into[1] = (char)scaled[1];
+        into[2] = (char)scaled[0];
+        break;
+      }
+      break;
+    }
+
+  case T_short:
+    {
+      LColor scaled = cdata->_clear_color.fmin(LColor(1)).fmax(LColor(-1));
+      scaled *= 32767;
+      switch (cdata->_num_components) {
+      case 2:
+        ((short *)into)[1] = (short)scaled[1];
+      case 1:
+        ((short *)into)[0] = (short)scaled[0];
+        break;
+      case 4:
+        ((short *)into)[3] = (short)scaled[3];
+      case 3: // BGR <-> RGB
+        ((short *)into)[0] = (short)scaled[2];
+        ((short *)into)[1] = (short)scaled[1];
+        ((short *)into)[2] = (short)scaled[0];
+        break;
+      }
+      break;
+    }
+
+  case T_unsigned_int:
+    {
+      // Note: there are no 32-bit UNORM textures.  Therefore, we don't do any
+      // normalization here, either.
+      switch (cdata->_num_components) {
+      case 2:
+        ((unsigned int *)into)[1] = (unsigned int)cdata->_clear_color[1];
+      case 1:
+        ((unsigned int *)into)[0] = (unsigned int)cdata->_clear_color[0];
+        break;
+      case 4:
+        ((unsigned int *)into)[3] = (unsigned int)cdata->_clear_color[3];
+      case 3: // BGR <-> RGB
+        ((unsigned int *)into)[0] = (unsigned int)cdata->_clear_color[2];
+        ((unsigned int *)into)[1] = (unsigned int)cdata->_clear_color[1];
+        ((unsigned int *)into)[2] = (unsigned int)cdata->_clear_color[0];
+        break;
+      }
+      break;
+    }
   }
 
   return cdata->_num_components * cdata->_component_width;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::consider_auto_process_ram_image
-//       Access: Protected
-//  Description: Should be called after a texture has been loaded into
-//               RAM, this considers generating mipmaps and/or
-//               compressing the RAM image.
-//
-//               Returns true if the image was modified by this
-//               operation, false if it wasn't.
-////////////////////////////////////////////////////////////////////
+/**
+ * Should be called after a texture has been loaded into RAM, this considers
+ * generating mipmaps and/or compressing the RAM image.
+ *
+ * Returns true if the image was modified by this operation, false if it
+ * wasn't.
+ */
 bool Texture::
 consider_auto_process_ram_image(bool generate_mipmaps, bool allow_compression) {
   CDWriter cdata(_cycler, false);
   return do_consider_auto_process_ram_image(cdata, generate_mipmaps, allow_compression);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_consider_auto_process_ram_image
-//       Access: Protected
-//  Description: Should be called after a texture has been loaded into
-//               RAM, this considers generating mipmaps and/or
-//               compressing the RAM image.
-//
-//               Returns true if the image was modified by this
-//               operation, false if it wasn't.
-////////////////////////////////////////////////////////////////////
+/**
+ * Should be called after a texture has been loaded into RAM, this considers
+ * generating mipmaps and/or compressing the RAM image.
+ *
+ * Returns true if the image was modified by this operation, false if it
+ * wasn't.
+ */
 bool Texture::
 do_consider_auto_process_ram_image(CData *cdata, bool generate_mipmaps,
                                    bool allow_compression) {
@@ -4532,7 +5691,7 @@ do_consider_auto_process_ram_image(CData *cdata, bool generate_mipmaps,
 
   if (generate_mipmaps && !driver_generate_mipmaps &&
       cdata->_ram_images.size() == 1) {
-    do_generate_ram_mipmap_images(cdata);
+    do_generate_ram_mipmap_images(cdata, false);
     modified = true;
   }
 
@@ -4557,16 +5716,18 @@ do_consider_auto_process_ram_image(CData *cdata, bool generate_mipmaps,
   return modified;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_compress_ram_image
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Texture::
 do_compress_ram_image(CData *cdata, Texture::CompressionMode compression,
                       Texture::QualityLevel quality_level,
                       GraphicsStateGuardianBase *gsg) {
   nassertr(compression != CM_off, false);
+
+  if (cdata->_ram_images.empty() || cdata->_ram_image_compression != CM_off) {
+    return false;
+  }
 
   if (compression == CM_on) {
     // Select an appropriate compression mode automatically.
@@ -4580,20 +5741,27 @@ do_compress_ram_image(CData *cdata, Texture::CompressionMode compression,
     case Texture::F_rgb332:
     case Texture::F_rgb16:
     case Texture::F_rgb32:
+    case Texture::F_rgb10_a2:
       if (gsg == NULL || gsg->get_supports_compressed_texture_format(CM_dxt1)) {
         compression = CM_dxt1;
-      } else if (gsg == NULL || gsg->get_supports_compressed_texture_format(CM_dxt3)) {
+      } else if (gsg->get_supports_compressed_texture_format(CM_dxt3)) {
         compression = CM_dxt3;
-      } else if (gsg == NULL || gsg->get_supports_compressed_texture_format(CM_dxt5)) {
+      } else if (gsg->get_supports_compressed_texture_format(CM_dxt5)) {
         compression = CM_dxt5;
+      } else if (gsg->get_supports_compressed_texture_format(CM_etc2)) {
+        compression = CM_etc2;
+      } else if (gsg->get_supports_compressed_texture_format(CM_etc1)) {
+        compression = CM_etc1;
       }
       break;
 
     case Texture::F_rgba4:
       if (gsg == NULL || gsg->get_supports_compressed_texture_format(CM_dxt3)) {
         compression = CM_dxt3;
-      } else if (gsg == NULL || gsg->get_supports_compressed_texture_format(CM_dxt5)) {
+      } else if (gsg->get_supports_compressed_texture_format(CM_dxt5)) {
         compression = CM_dxt5;
+      } else if (gsg->get_supports_compressed_texture_format(CM_etc2)) {
+        compression = CM_etc2;
       }
       break;
 
@@ -4604,6 +5772,17 @@ do_compress_ram_image(CData *cdata, Texture::CompressionMode compression,
     case Texture::F_rgba32:
       if (gsg == NULL || gsg->get_supports_compressed_texture_format(CM_dxt5)) {
         compression = CM_dxt5;
+      } else if (gsg->get_supports_compressed_texture_format(CM_etc2)) {
+        compression = CM_etc2;
+      }
+      break;
+
+    case Texture::F_red:
+    case Texture::F_rg:
+      if (gsg == NULL || gsg->get_supports_compressed_texture_format(CM_rgtc)) {
+        compression = CM_rgtc;
+      } else if (gsg->get_supports_compressed_texture_format(CM_eac)) {
+        compression = CM_eac;
       }
       break;
 
@@ -4618,6 +5797,77 @@ do_compress_ram_image(CData *cdata, Texture::CompressionMode compression,
   }
   if (quality_level == Texture::QL_default) {
     quality_level = texture_quality_level;
+  }
+
+  if (compression == CM_rgtc) {
+    // We should compress RGTC ourselves, as squish does not support it.
+    if (cdata->_component_type != T_unsigned_byte) {
+      return false;
+    }
+
+    if (!do_has_all_ram_mipmap_images(cdata)) {
+      // If we're about to compress the RAM image, we should ensure that we
+      // have all of the mipmap levels first.
+      do_generate_ram_mipmap_images(cdata, false);
+    }
+
+    RamImages compressed_ram_images;
+    compressed_ram_images.resize(cdata->_ram_images.size());
+
+    for (size_t n = 0; n < cdata->_ram_images.size(); ++n) {
+      const RamImage *uncompressed_image = &cdata->_ram_images[n];
+
+      int x_size = do_get_expected_mipmap_x_size(cdata, n);
+      int y_size = do_get_expected_mipmap_y_size(cdata, n);
+      int num_pages = do_get_expected_mipmap_num_pages(cdata, n);
+
+      // It is important that we handle image sizes that aren't a multiple of
+      // the block size, since this method may be used to compress mipmaps,
+      // which go all the way to 1x1.  Pad the image if necessary.
+      RamImage temp_image;
+      if ((x_size | y_size) & 0x3) {
+        int virtual_x_size = x_size;
+        int virtual_y_size = y_size;
+        x_size = (x_size + 3) & ~0x3;
+        y_size = (y_size + 3) & ~0x3;
+
+        temp_image._page_size = x_size * y_size * cdata->_num_components;
+        temp_image._image = PTA_uchar::empty_array(temp_image._page_size * num_pages);
+
+        for (int z = 0; z < num_pages; ++z) {
+          unsigned char *dest = temp_image._image.p() + z * temp_image._page_size;
+          unsigned const char *src = uncompressed_image->_image.p() + z * uncompressed_image->_page_size;
+
+          for (int y = 0; y < virtual_y_size; ++y) {
+            memcpy(dest, src, virtual_x_size);
+            src += virtual_x_size;
+            dest += x_size;
+          }
+        }
+
+        uncompressed_image = &temp_image;
+      }
+
+      // Create a new image to hold the compressed texture pages.
+      RamImage &compressed_image = compressed_ram_images[n];
+      compressed_image._page_size = (x_size * y_size * cdata->_num_components) >> 1;
+      compressed_image._image = PTA_uchar::empty_array(compressed_image._page_size * num_pages);
+
+      if (cdata->_num_components == 1) {
+        do_compress_ram_image_bc4(*uncompressed_image, compressed_image,
+                                  x_size, y_size, num_pages);
+      } else if (cdata->_num_components == 2) {
+        do_compress_ram_image_bc5(*uncompressed_image, compressed_image,
+                                  x_size, y_size, num_pages);
+      } else {
+        // Invalid.
+        return false;
+      }
+    }
+
+    cdata->_ram_images.swap(compressed_ram_images);
+    cdata->_ram_image_compression = CM_rgtc;
+    return true;
   }
 
 #ifdef HAVE_SQUISH
@@ -4673,13 +5923,44 @@ do_compress_ram_image(CData *cdata, Texture::CompressionMode compression,
   return false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_uncompress_ram_image
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Texture::
 do_uncompress_ram_image(CData *cdata) {
+  nassertr(!cdata->_ram_images.empty(), false);
+
+  if (cdata->_ram_image_compression == CM_rgtc) {
+    // We should decompress RGTC ourselves, as squish doesn't support it.
+    RamImages uncompressed_ram_images;
+    uncompressed_ram_images.resize(cdata->_ram_images.size());
+
+    for (size_t n = 0; n < cdata->_ram_images.size(); ++n) {
+      const RamImage &compressed_image = cdata->_ram_images[n];
+
+      int x_size = do_get_expected_mipmap_x_size(cdata, n);
+      int y_size = do_get_expected_mipmap_y_size(cdata, n);
+      int num_pages = do_get_expected_mipmap_num_pages(cdata, n);
+
+      RamImage &uncompressed_image = uncompressed_ram_images[n];
+      uncompressed_image._page_size = do_get_expected_ram_mipmap_page_size(cdata, n);
+      uncompressed_image._image = PTA_uchar::empty_array(uncompressed_image._page_size * num_pages);
+
+      if (cdata->_num_components == 1) {
+        do_uncompress_ram_image_bc4(compressed_image, uncompressed_image,
+                                    x_size, y_size, num_pages);
+      } else if (cdata->_num_components == 2) {
+        do_uncompress_ram_image_bc5(compressed_image, uncompressed_image,
+                                    x_size, y_size, num_pages);
+      } else {
+        // Invalid.
+        return false;
+      }
+    }
+    cdata->_ram_images.swap(uncompressed_ram_images);
+    cdata->_ram_image_compression = CM_off;
+    return true;
+  }
 
 #ifdef HAVE_SQUISH
   if (cdata->_texture_type != TT_3d_texture &&
@@ -4714,11 +5995,436 @@ do_uncompress_ram_image(CData *cdata) {
   return false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_has_all_ram_mipmap_images
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ * Compresses a RAM image using BC4 compression.
+ */
+void Texture::
+do_compress_ram_image_bc4(const RamImage &uncompressed_image,
+                          RamImage &compressed_image,
+                          int x_size, int y_size, int num_pages) {
+  int x_blocks = (x_size >> 2);
+  int y_blocks = (y_size >> 2);
+
+  // NB. This algorithm isn't fully optimal, since it doesn't try to make use
+  // of the secondary interpolation mode supported by BC4.  This is not
+  // important for most textures, but it may be added in the future.
+
+  nassertv((size_t)x_blocks * (size_t)y_blocks * 4 * 4 <= uncompressed_image._page_size);
+  nassertv((size_t)x_size * (size_t)y_size == uncompressed_image._page_size);
+
+  static const int remap[] = {1, 7, 6, 5, 4, 3, 2, 0};
+
+  for (int z = 0; z < num_pages; ++z) {
+    unsigned char *dest = compressed_image._image.p() + z * compressed_image._page_size;
+    unsigned const char *src = uncompressed_image._image.p() + z * uncompressed_image._page_size;
+
+    // Convert one 4 x 4 block at a time.
+    for (int y = 0; y < y_blocks; ++y) {
+      for (int x = 0; x < x_blocks; ++x) {
+        int a, b, c, d;
+        float fac, add;
+        unsigned char minv, maxv;
+        unsigned const char *blk = src;
+
+        // Find the minimum and maximum value in the block.
+        minv = blk[0];
+        maxv = blk[0];
+        minv = min(blk[1], minv); maxv = max(blk[1], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[3], minv); maxv = max(blk[3], maxv);
+        blk += x_size;
+        minv = min(blk[0], minv); maxv = max(blk[0], maxv);
+        minv = min(blk[1], minv); maxv = max(blk[1], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[3], minv); maxv = max(blk[3], maxv);
+        blk += x_size;
+        minv = min(blk[0], minv); maxv = max(blk[0], maxv);
+        minv = min(blk[1], minv); maxv = max(blk[1], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[3], minv); maxv = max(blk[3], maxv);
+        blk += x_size;
+        minv = min(blk[0], minv); maxv = max(blk[0], maxv);
+        minv = min(blk[1], minv); maxv = max(blk[1], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[3], minv); maxv = max(blk[3], maxv);
+
+        // Now calculate the index for each pixel.
+        blk = src;
+        if (maxv > minv) {
+          fac = 7.5f / (maxv - minv);
+        } else {
+          fac = 0;
+        }
+        add = -minv * fac;
+        a = (remap[(int)(blk[0] * fac + add)])
+          | (remap[(int)(blk[1] * fac + add)] << 3)
+          | (remap[(int)(blk[2] * fac + add)] << 6)
+          | (remap[(int)(blk[3] * fac + add)] << 9);
+        blk += x_size;
+        b = (remap[(int)(blk[0] * fac + add)] << 4)
+          | (remap[(int)(blk[1] * fac + add)] << 7)
+          | (remap[(int)(blk[2] * fac + add)] << 10)
+          | (remap[(int)(blk[3] * fac + add)] << 13);
+        blk += x_size;
+        c = (remap[(int)(blk[0] * fac + add)])
+          | (remap[(int)(blk[1] * fac + add)] << 3)
+          | (remap[(int)(blk[2] * fac + add)] << 6)
+          | (remap[(int)(blk[3] * fac + add)] << 9);
+        blk += x_size;
+        d = (remap[(int)(blk[0] * fac + add)] << 4)
+          | (remap[(int)(blk[1] * fac + add)] << 7)
+          | (remap[(int)(blk[2] * fac + add)] << 10)
+          | (remap[(int)(blk[3] * fac + add)] << 13);
+
+        *(dest++) = maxv;
+        *(dest++) = minv;
+        *(dest++) = a & 0xff;
+        *(dest++) = (a >> 8) | (b & 0xf0);
+        *(dest++) = b >> 8;
+        *(dest++) = c & 0xff;
+        *(dest++) = (c >> 8) | (d & 0xf0);
+        *(dest++) = d >> 8;
+
+        // Advance to the beginning of the next 4x4 block.
+        src += 4;
+      }
+      src += x_size * 3;
+    }
+    Thread::consider_yield();
+  }
+}
+
+/**
+ * Compresses a RAM image using BC5 compression.
+ */
+void Texture::
+do_compress_ram_image_bc5(const RamImage &uncompressed_image,
+                          RamImage &compressed_image,
+                          int x_size, int y_size, int num_pages) {
+  int x_blocks = (x_size >> 2);
+  int y_blocks = (y_size >> 2);
+  int stride = x_size * 2;
+
+  // BC5 uses the same compression algorithm as BC4, except repeated for two
+  // channels.
+
+  nassertv((size_t)x_blocks * (size_t)y_blocks * 4 * 4 * 2 <= uncompressed_image._page_size);
+  nassertv((size_t)stride * (size_t)y_size == uncompressed_image._page_size);
+
+  static const int remap[] = {1, 7, 6, 5, 4, 3, 2, 0};
+
+  for (int z = 0; z < num_pages; ++z) {
+    unsigned char *dest = compressed_image._image.p() + z * compressed_image._page_size;
+    unsigned const char *src = uncompressed_image._image.p() + z * uncompressed_image._page_size;
+
+    // Convert one 4 x 4 block at a time.
+    for (int y = 0; y < y_blocks; ++y) {
+      for (int x = 0; x < x_blocks; ++x) {
+        int a, b, c, d;
+        float fac, add;
+        unsigned char minv, maxv;
+        unsigned const char *blk = src;
+
+        // Find the minimum and maximum red value in the block.
+        minv = blk[0];
+        maxv = blk[0];
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[4], minv); maxv = max(blk[4], maxv);
+        minv = min(blk[6], minv); maxv = max(blk[6], maxv);
+        blk += stride;
+        minv = min(blk[0], minv); maxv = max(blk[0], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[4], minv); maxv = max(blk[4], maxv);
+        minv = min(blk[6], minv); maxv = max(blk[6], maxv);
+        blk += stride;
+        minv = min(blk[0], minv); maxv = max(blk[0], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[4], minv); maxv = max(blk[4], maxv);
+        minv = min(blk[6], minv); maxv = max(blk[6], maxv);
+        blk += stride;
+        minv = min(blk[0], minv); maxv = max(blk[0], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[4], minv); maxv = max(blk[4], maxv);
+        minv = min(blk[6], minv); maxv = max(blk[6], maxv);
+
+        // Now calculate the index for each pixel.
+        if (maxv > minv) {
+          fac = 7.5f / (maxv - minv);
+        } else {
+          fac = 0;
+        }
+        add = -minv * fac;
+        blk = src;
+        a = (remap[(int)(blk[0] * fac + add)])
+          | (remap[(int)(blk[2] * fac + add)] << 3)
+          | (remap[(int)(blk[4] * fac + add)] << 6)
+          | (remap[(int)(blk[6] * fac + add)] << 9);
+        blk += stride;
+        b = (remap[(int)(blk[0] * fac + add)] << 4)
+          | (remap[(int)(blk[2] * fac + add)] << 7)
+          | (remap[(int)(blk[4] * fac + add)] << 10)
+          | (remap[(int)(blk[6] * fac + add)] << 13);
+        blk += stride;
+        c = (remap[(int)(blk[0] * fac + add)])
+          | (remap[(int)(blk[2] * fac + add)] << 3)
+          | (remap[(int)(blk[4] * fac + add)] << 6)
+          | (remap[(int)(blk[6] * fac + add)] << 9);
+        blk += stride;
+        d = (remap[(int)(blk[0] * fac + add)] << 4)
+          | (remap[(int)(blk[2] * fac + add)] << 7)
+          | (remap[(int)(blk[4] * fac + add)] << 10)
+          | (remap[(int)(blk[6] * fac + add)] << 13);
+
+        *(dest++) = maxv;
+        *(dest++) = minv;
+        *(dest++) = a & 0xff;
+        *(dest++) = (a >> 8) | (b & 0xf0);
+        *(dest++) = b >> 8;
+        *(dest++) = c & 0xff;
+        *(dest++) = (c >> 8) | (d & 0xf0);
+        *(dest++) = d >> 8;
+
+        // Find the minimum and maximum green value in the block.
+        blk = src + 1;
+        minv = blk[0];
+        maxv = blk[0];
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[4], minv); maxv = max(blk[4], maxv);
+        minv = min(blk[6], minv); maxv = max(blk[6], maxv);
+        blk += stride;
+        minv = min(blk[0], minv); maxv = max(blk[0], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[4], minv); maxv = max(blk[4], maxv);
+        minv = min(blk[6], minv); maxv = max(blk[6], maxv);
+        blk += stride;
+        minv = min(blk[0], minv); maxv = max(blk[0], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[4], minv); maxv = max(blk[4], maxv);
+        minv = min(blk[6], minv); maxv = max(blk[6], maxv);
+        blk += stride;
+        minv = min(blk[0], minv); maxv = max(blk[0], maxv);
+        minv = min(blk[2], minv); maxv = max(blk[2], maxv);
+        minv = min(blk[4], minv); maxv = max(blk[4], maxv);
+        minv = min(blk[6], minv); maxv = max(blk[6], maxv);
+
+        // Now calculate the index for each pixel.
+        if (maxv > minv) {
+          fac = 7.5f / (maxv - minv);
+        } else {
+          fac = 0;
+        }
+        add = -minv * fac;
+        blk = src + 1;
+        a = (remap[(int)(blk[0] * fac + add)])
+          | (remap[(int)(blk[2] * fac + add)] << 3)
+          | (remap[(int)(blk[4] * fac + add)] << 6)
+          | (remap[(int)(blk[6] * fac + add)] << 9);
+        blk += stride;
+        b = (remap[(int)(blk[0] * fac + add)] << 4)
+          | (remap[(int)(blk[2] * fac + add)] << 7)
+          | (remap[(int)(blk[4] * fac + add)] << 10)
+          | (remap[(int)(blk[6] * fac + add)] << 13);
+        blk += stride;
+        c = (remap[(int)(blk[0] * fac + add)])
+          | (remap[(int)(blk[2] * fac + add)] << 3)
+          | (remap[(int)(blk[4] * fac + add)] << 6)
+          | (remap[(int)(blk[6] * fac + add)] << 9);
+        blk += stride;
+        d = (remap[(int)(blk[0] * fac + add)] << 4)
+          | (remap[(int)(blk[2] * fac + add)] << 7)
+          | (remap[(int)(blk[4] * fac + add)] << 10)
+          | (remap[(int)(blk[6] * fac + add)] << 13);
+
+        *(dest++) = maxv;
+        *(dest++) = minv;
+        *(dest++) = a & 0xff;
+        *(dest++) = (a >> 8) | (b & 0xf0);
+        *(dest++) = b >> 8;
+        *(dest++) = c & 0xff;
+        *(dest++) = (c >> 8) | (d & 0xf0);
+        *(dest++) = d >> 8;
+
+        // Advance to the beginning of the next 4x4 block.
+        src += 8;
+      }
+      src += stride * 3;
+    }
+    Thread::consider_yield();
+  }
+}
+
+/**
+ * Decompresses a RAM image compressed using BC4.
+ */
+void Texture::
+do_uncompress_ram_image_bc4(const RamImage &compressed_image,
+                            RamImage &uncompressed_image,
+                            int x_size, int y_size, int num_pages) {
+  int x_blocks = (x_size >> 2);
+  int y_blocks = (y_size >> 2);
+
+  for (int z = 0; z < num_pages; ++z) {
+    unsigned char *dest = uncompressed_image._image.p() + z * uncompressed_image._page_size;
+    unsigned const char *src = compressed_image._image.p() + z * compressed_image._page_size;
+
+    // Unconvert one 4 x 4 block at a time.
+    uint8_t tbl[8];
+    for (int y = 0; y < y_blocks; ++y) {
+      for (int x = 0; x < x_blocks; ++x) {
+        unsigned char *blk = dest;
+        tbl[0] = src[0];
+        tbl[1] = src[1];
+        if (tbl[0] > tbl[1]) {
+          tbl[2] = (tbl[0] * 6 + tbl[1] * 1) / 7.0f;
+          tbl[3] = (tbl[0] * 5 + tbl[1] * 2) / 7.0f;
+          tbl[4] = (tbl[0] * 4 + tbl[1] * 3) / 7.0f;
+          tbl[5] = (tbl[0] * 3 + tbl[1] * 4) / 7.0f;
+          tbl[6] = (tbl[0] * 2 + tbl[1] * 5) / 7.0f;
+          tbl[7] = (tbl[0] * 1 + tbl[1] * 6) / 7.0f;
+        } else {
+          tbl[2] = (tbl[0] * 4 + tbl[1] * 1) / 5.0f;
+          tbl[3] = (tbl[0] * 3 + tbl[1] * 2) / 5.0f;
+          tbl[4] = (tbl[0] * 2 + tbl[1] * 3) / 5.0f;
+          tbl[5] = (tbl[0] * 1 + tbl[1] * 4) / 5.0f;
+          tbl[6] = 0;
+          tbl[7] = 255;
+        }
+        int v = src[2] + (src[3] << 8) + (src[4] << 16);
+        blk[0] = tbl[v & 0x7];
+        blk[1] = tbl[(v & 0x000038) >> 3];
+        blk[2] = tbl[(v & 0x0001c0) >> 6];
+        blk[3] = tbl[(v & 0x000e00) >> 9];
+        blk += x_size;
+        blk[0] = tbl[(v & 0x007000) >> 12];
+        blk[1] = tbl[(v & 0x038000) >> 15];
+        blk[2] = tbl[(v & 0x1c0000) >> 18];
+        blk[3] = tbl[(v & 0xe00000) >> 21];
+        blk += x_size;
+        v = src[5] + (src[6] << 8) + (src[7] << 16);
+        blk[0] = tbl[v & 0x7];
+        blk[1] = tbl[(v & 0x000038) >> 3];
+        blk[2] = tbl[(v & 0x0001c0) >> 6];
+        blk[3] = tbl[(v & 0x000e00) >> 9];
+        blk += x_size;
+        blk[0] = tbl[(v & 0x007000) >> 12];
+        blk[1] = tbl[(v & 0x038000) >> 15];
+        blk[2] = tbl[(v & 0x1c0000) >> 18];
+        blk[3] = tbl[(v & 0xe00000) >> 21];
+        src += 8;
+        dest += 4;
+      }
+      dest += x_size * 3;
+    }
+    Thread::consider_yield();
+  }
+}
+
+/**
+ * Decompresses a RAM image compressed using BC5.
+ */
+void Texture::
+do_uncompress_ram_image_bc5(const RamImage &compressed_image,
+                            RamImage &uncompressed_image,
+                            int x_size, int y_size, int num_pages) {
+  int x_blocks = (x_size >> 2);
+  int y_blocks = (y_size >> 2);
+  int stride = x_size * 2;
+
+  for (int z = 0; z < num_pages; ++z) {
+    unsigned char *dest = uncompressed_image._image.p() + z * uncompressed_image._page_size;
+    unsigned const char *src = compressed_image._image.p() + z * compressed_image._page_size;
+
+    // Unconvert one 4 x 4 block at a time.
+    uint8_t red[8];
+    uint8_t grn[8];
+    for (int y = 0; y < y_blocks; ++y) {
+      for (int x = 0; x < x_blocks; ++x) {
+        unsigned char *blk = dest;
+        red[0] = src[0];
+        red[1] = src[1];
+        if (red[0] > red[1]) {
+          red[2] = (red[0] * 6 + red[1] * 1) / 7.0f;
+          red[3] = (red[0] * 5 + red[1] * 2) / 7.0f;
+          red[4] = (red[0] * 4 + red[1] * 3) / 7.0f;
+          red[5] = (red[0] * 3 + red[1] * 4) / 7.0f;
+          red[6] = (red[0] * 2 + red[1] * 5) / 7.0f;
+          red[7] = (red[0] * 1 + red[1] * 6) / 7.0f;
+        } else {
+          red[2] = (red[0] * 4 + red[1] * 1) / 5.0f;
+          red[3] = (red[0] * 3 + red[1] * 2) / 5.0f;
+          red[4] = (red[0] * 2 + red[1] * 3) / 5.0f;
+          red[5] = (red[0] * 1 + red[1] * 4) / 5.0f;
+          red[6] = 0;
+          red[7] = 255;
+        }
+        grn[0] = src[8];
+        grn[1] = src[9];
+        if (grn[0] > grn[1]) {
+          grn[2] = (grn[0] * 6 + grn[1] * 1) / 7.0f;
+          grn[3] = (grn[0] * 5 + grn[1] * 2) / 7.0f;
+          grn[4] = (grn[0] * 4 + grn[1] * 3) / 7.0f;
+          grn[5] = (grn[0] * 3 + grn[1] * 4) / 7.0f;
+          grn[6] = (grn[0] * 2 + grn[1] * 5) / 7.0f;
+          grn[7] = (grn[0] * 1 + grn[1] * 6) / 7.0f;
+        } else {
+          grn[2] = (grn[0] * 4 + grn[1] * 1) / 5.0f;
+          grn[3] = (grn[0] * 3 + grn[1] * 2) / 5.0f;
+          grn[4] = (grn[0] * 2 + grn[1] * 3) / 5.0f;
+          grn[5] = (grn[0] * 1 + grn[1] * 4) / 5.0f;
+          grn[6] = 0;
+          grn[7] = 255;
+        }
+        int r = src[2] + (src[3] << 8) + (src[4] << 16);
+        int g = src[10] + (src[11] << 8) + (src[12] << 16);
+        blk[0] = red[r & 0x7];
+        blk[1] = grn[g & 0x7];
+        blk[2] = red[(r & 0x000038) >> 3];
+        blk[3] = grn[(g & 0x000038) >> 3];
+        blk[4] = red[(r & 0x0001c0) >> 6];
+        blk[5] = grn[(g & 0x0001c0) >> 6];
+        blk[6] = red[(r & 0x000e00) >> 9];
+        blk[7] = grn[(g & 0x000e00) >> 9];
+        blk += stride;
+        blk[0] = red[(r & 0x007000) >> 12];
+        blk[1] = grn[(g & 0x007000) >> 12];
+        blk[2] = red[(r & 0x038000) >> 15];
+        blk[3] = grn[(g & 0x038000) >> 15];
+        blk[4] = red[(r & 0x1c0000) >> 18];
+        blk[5] = grn[(g & 0x1c0000) >> 18];
+        blk[6] = red[(r & 0xe00000) >> 21];
+        blk[7] = grn[(g & 0xe00000) >> 21];
+        blk += stride;
+        r = src[5] + (src[6] << 8) + (src[7] << 16);
+        g = src[13] + (src[14] << 8) + (src[15] << 16);
+        blk[0] = red[r & 0x7];
+        blk[1] = grn[g & 0x7];
+        blk[2] = red[(r & 0x000038) >> 3];
+        blk[3] = grn[(g & 0x000038) >> 3];
+        blk[4] = red[(r & 0x0001c0) >> 6];
+        blk[5] = grn[(g & 0x0001c0) >> 6];
+        blk[6] = red[(r & 0x000e00) >> 9];
+        blk[7] = grn[(g & 0x000e00) >> 9];
+        blk += stride;
+        blk[0] = red[(r & 0x007000) >> 12];
+        blk[1] = grn[(g & 0x007000) >> 12];
+        blk[2] = red[(r & 0x038000) >> 15];
+        blk[3] = grn[(g & 0x038000) >> 15];
+        blk[4] = red[(r & 0x1c0000) >> 18];
+        blk[5] = grn[(g & 0x1c0000) >> 18];
+        blk[6] = red[(r & 0xe00000) >> 21];
+        blk[7] = grn[(g & 0xe00000) >> 21];
+        src += 16;
+        dest += 8;
+      }
+      dest += stride * 3;
+    }
+    Thread::consider_yield();
+  }
+}
+
+/**
+ *
+ */
 bool Texture::
 do_has_all_ram_mipmap_images(const CData *cdata) const {
   if (cdata->_ram_images.empty() || cdata->_ram_images[0]._image.empty()) {
@@ -4726,13 +6432,12 @@ do_has_all_ram_mipmap_images(const CData *cdata) const {
     return false;
   }
   if (!uses_mipmaps()) {
-    // If we have a base image and don't require mipmapping, the
-    // answer is yes.
+    // If we have a base image and don't require mipmapping, the answer is
+    // yes.
     return true;
   }
 
-  // Check that we have enough mipmap levels to meet the size
-  // requirements.
+  // Check that we have enough mipmap levels to meet the size requirements.
   int size = max(cdata->_x_size, max(cdata->_y_size, cdata->_z_size));
   int n = 0;
   int x = 1;
@@ -4747,42 +6452,38 @@ do_has_all_ram_mipmap_images(const CData *cdata) const {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_reconsider_z_size
-//       Access: Protected
-//  Description: Considers whether the z_size (or num_views) should
-//               automatically be adjusted when the user loads a new
-//               page.  Returns true if the z size is valid, false
-//               otherwise.
-//
-//               Assumes the lock is already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * Considers whether the z_size (or num_views) should automatically be
+ * adjusted when the user loads a new page.  Returns true if the z size is
+ * valid, false otherwise.
+ *
+ * Assumes the lock is already held.
+ */
 bool Texture::
 do_reconsider_z_size(CData *cdata, int z, const LoaderOptions &options) {
   if (z >= cdata->_z_size * cdata->_num_views) {
     bool num_views_specified = true;
     if (options.get_texture_flags() & LoaderOptions::TF_multiview) {
-      // This flag is false if is a multiview texture with a specified
-      // number of views.  It is true if it is not a multiview
-      // texture, or if it is but the number of views is explicitly
-      // specified.
+      // This flag is false if is a multiview texture with a specified number
+      // of views.  It is true if it is not a multiview texture, or if it is
+      // but the number of views is explicitly specified.
       num_views_specified = (options.get_texture_num_views() != 0);
     }
 
     if (num_views_specified &&
         (cdata->_texture_type == Texture::TT_3d_texture ||
          cdata->_texture_type == Texture::TT_2d_texture_array)) {
-      // If we're loading a page past _z_size, treat it as an implicit
-      // request to enlarge _z_size.  However, this is only legal if
-      // this is, in fact, a 3-d texture or a 2d texture array (cube maps
-      // always have z_size 6, and other types have z_size 1).
+      // If we're loading a page past _z_size, treat it as an implicit request
+      // to enlarge _z_size.  However, this is only legal if this is, in fact,
+      // a 3-d texture or a 2d texture array (cube maps always have z_size 6,
+      // and other types have z_size 1).
       nassertr(cdata->_num_views != 0, false);
       cdata->_z_size = (z / cdata->_num_views) + 1;
 
     } else if (cdata->_z_size != 0) {
-      // In the case of a 2-d texture or cube map, or a 3-d texture
-      // with an unspecified _num_views, assume we're loading views of
-      // a multiview texture.
+      // In the case of a 2-d texture or cube map, or a 3-d texture with an
+      // unspecified _num_views, assume we're loading views of a multiview
+      // texture.
       cdata->_num_views = (z / cdata->_z_size) + 1;
 
     } else {
@@ -4790,23 +6491,20 @@ do_reconsider_z_size(CData *cdata, int z, const LoaderOptions &options) {
       cdata->_z_size = 1;
     }
 
-    // Increase the size of the data buffer to make room for the new
-    // texture level.
+    // Increase the size of the data buffer to make room for the new texture
+    // level.
     do_allocate_pages(cdata);
   }
 
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_allocate_pages
-//       Access: Protected, Virtual
-//  Description: Called internally by do_reconsider_z_size() to
-//               allocate new memory in _ram_images[0] for the new
-//               number of pages.
-//
-//               Assumes the lock is already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called internally by do_reconsider_z_size() to allocate new memory in
+ * _ram_images[0] for the new number of pages.
+ *
+ * Assumes the lock is already held.
+ */
 void Texture::
 do_allocate_pages(CData *cdata) {
   size_t new_size = do_get_expected_ram_image_size(cdata);
@@ -4818,25 +6516,22 @@ do_allocate_pages(CData *cdata) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_reconsider_image_properties
-//       Access: Protected
-//  Description: Resets the internal Texture properties when a new
-//               image file is loaded.  Returns true if the new image
-//               is valid, false otherwise.
-//
-//               Assumes the lock is already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * Resets the internal Texture properties when a new image file is loaded.
+ * Returns true if the new image is valid, false otherwise.
+ *
+ * Assumes the lock is already held.
+ */
 bool Texture::
 do_reconsider_image_properties(CData *cdata, int x_size, int y_size, int num_components,
                                Texture::ComponentType component_type, int z,
                                const LoaderOptions &options) {
   if (!cdata->_loaded_from_image || num_components != cdata->_num_components || component_type != cdata->_component_type) {
-    // Come up with a default format based on the number of channels.
-    // But only do this the first time the file is loaded, or if the
-    // number of channels in the image changes on subsequent loads.
+    // Come up with a default format based on the number of channels.  But
+    // only do this the first time the file is loaded, or if the number of
+    // channels in the image changes on subsequent loads.
 
-    //TODO: handle sRGB properly
+    // TODO: handle sRGB properly
     switch (num_components) {
     case 1:
       cdata->_format = F_luminance;
@@ -4869,11 +6564,17 @@ do_reconsider_image_properties(CData *cdata, int x_size, int y_size, int num_com
     }
 
 #ifndef NDEBUG
-    if (cdata->_texture_type == TT_1d_texture ||
-        cdata->_texture_type == TT_buffer_texture) {
+    switch (cdata->_texture_type) {
+    case TT_1d_texture:
+    case TT_buffer_texture:
       nassertr(y_size == 1, false);
-    } else if (cdata->_texture_type == TT_cube_map) {
+      break;
+    case TT_cube_map:
+    case TT_cube_map_array:
       nassertr(x_size == y_size, false);
+      break;
+    default:
+      break;
     }
 #endif
     if ((cdata->_x_size != x_size)||(cdata->_y_size != y_size)) {
@@ -4899,11 +6600,9 @@ do_reconsider_image_properties(CData *cdata, int x_size, int y_size, int num_com
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_rescale_texture
-//       Access: Private
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Texture::
 do_rescale_texture(CData *cdata) {
   int new_x_size = cdata->_x_size;
@@ -4978,22 +6677,18 @@ do_rescale_texture(CData *cdata) {
   return false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::make_copy_impl
-//       Access: Protected, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 PT(Texture) Texture::
 make_copy_impl() const {
   CDReader cdata(_cycler);
   return do_make_copy(cdata);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_make_copy
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 PT(Texture) Texture::
 do_make_copy(const CData *cdata) const {
   PT(Texture) tex = new Texture(get_name());
@@ -5002,23 +6697,18 @@ do_make_copy(const CData *cdata) const {
   return tex;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_assign
-//       Access: Protected
-//  Description: The internal implementation of operator =().  Assumes
-//               the lock is already held on both Textures.
-////////////////////////////////////////////////////////////////////
+/**
+ * The internal implementation of operator =().  Assumes the lock is already
+ * held on both Textures.
+ */
 void Texture::
 do_assign(CData *cdata, const Texture *copy, const CData *cdata_copy) {
   cdata->do_assign(cdata_copy);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_clear
-//       Access: Protected, Virtual
-//  Description: The protected implementation of clear().  Assumes the
-//               lock is already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * The protected implementation of clear().  Assumes the lock is already held.
+ */
 void Texture::
 do_clear(CData *cdata) {
   Texture tex;
@@ -5031,11 +6721,9 @@ do_clear(CData *cdata) {
   cdata->inc_simple_image_modified();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_setup_texture
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_setup_texture(CData *cdata, Texture::TextureType texture_type,
                  int x_size, int y_size, int z_size,
@@ -5060,9 +6748,18 @@ do_setup_texture(CData *cdata, Texture::TextureType texture_type,
     // Cube maps must always consist of six square images.
     nassertv(x_size == y_size && z_size == 6);
 
-    // In principle the wrap mode shouldn't mean anything to a cube
-    // map, but some drivers seem to misbehave if it's other than
+    // In principle the wrap mode shouldn't mean anything to a cube map, but
+    // some drivers seem to misbehave if it's other than
     // SamplerState::WM_clamp.
+    cdata->_default_sampler.set_wrap_u(SamplerState::WM_clamp);
+    cdata->_default_sampler.set_wrap_v(SamplerState::WM_clamp);
+    cdata->_default_sampler.set_wrap_w(SamplerState::WM_clamp);
+    break;
+
+  case TT_cube_map_array:
+    // Cube maps array z_size needs to be a multiple of 6.
+    nassertv(x_size == y_size && z_size % 6 == 0);
+
     cdata->_default_sampler.set_wrap_u(SamplerState::WM_clamp);
     cdata->_default_sampler.set_wrap_v(SamplerState::WM_clamp);
     cdata->_default_sampler.set_wrap_w(SamplerState::WM_clamp);
@@ -5095,11 +6792,9 @@ do_setup_texture(CData *cdata, Texture::TextureType texture_type,
   cdata->_has_read_mipmaps = false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_format
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_format(CData *cdata, Texture::Format format) {
   if (format == cdata->_format) {
@@ -5121,6 +6816,7 @@ do_set_format(CData *cdata, Texture::Format format) {
   case F_alpha:
   case F_luminance:
   case F_r16:
+  case F_r16i:
   case F_sluminance:
   case F_r32i:
   case F_r32:
@@ -5134,6 +6830,7 @@ do_set_format(CData *cdata, Texture::Format format) {
   case F_sluminance_alpha:
   case F_rg32:
   case F_rg8i:
+  case F_rg:
     cdata->_num_components = 2;
     break;
 
@@ -5146,6 +6843,8 @@ do_set_format(CData *cdata, Texture::Format format) {
   case F_srgb:
   case F_rgb32:
   case F_rgb8i:
+  case F_r11_g11_b10:
+  case F_rgb9_e5:
     cdata->_num_components = 3;
     break;
 
@@ -5159,48 +6858,43 @@ do_set_format(CData *cdata, Texture::Format format) {
   case F_rgba32:
   case F_srgb_alpha:
   case F_rgba8i:
+  case F_rgb10_a2:
     cdata->_num_components = 4;
     break;
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_component_type
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_component_type(CData *cdata, Texture::ComponentType component_type) {
   cdata->_component_type = component_type;
 
   switch (component_type) {
   case T_unsigned_byte:
+  case T_byte:
     cdata->_component_width = 1;
     break;
 
   case T_unsigned_short:
+  case T_short:
+  case T_half_float:
     cdata->_component_width = 2;
     break;
 
   case T_float:
-    cdata->_component_width = 4;
-    break;
-
   case T_unsigned_int_24_8:
-    cdata->_component_width = 4;
-    break;
-
   case T_int:
+  case T_unsigned_int:
     cdata->_component_width = 4;
     break;
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_x_size
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_x_size(CData *cdata, int x_size) {
   if (cdata->_x_size != x_size) {
@@ -5211,11 +6905,9 @@ do_set_x_size(CData *cdata, int x_size) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_y_size
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_y_size(CData *cdata, int y_size) {
   if (cdata->_y_size != y_size) {
@@ -5228,18 +6920,16 @@ do_set_y_size(CData *cdata, int y_size) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_z_size
-//       Access: Protected
-//  Description: Changes the z size indicated for the texture.  This
-//               also implicitly unloads the texture if it has already
-//               been loaded.
-////////////////////////////////////////////////////////////////////
+/**
+ * Changes the z size indicated for the texture.  This also implicitly unloads
+ * the texture if it has already been loaded.
+ */
 void Texture::
 do_set_z_size(CData *cdata, int z_size) {
   if (cdata->_z_size != z_size) {
     nassertv((cdata->_texture_type == Texture::TT_3d_texture) ||
              (cdata->_texture_type == Texture::TT_cube_map && z_size == 6) ||
+             (cdata->_texture_type == Texture::TT_cube_map_array && z_size % 6 == 0) ||
              (cdata->_texture_type == Texture::TT_2d_texture_array) || (z_size == 1));
     cdata->_z_size = z_size;
     cdata->inc_image_modified();
@@ -5248,11 +6938,9 @@ do_set_z_size(CData *cdata, int z_size) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_num_views
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_num_views(CData *cdata, int num_views) {
   nassertv(num_views >= 1);
@@ -5266,11 +6954,9 @@ do_set_num_views(CData *cdata, int num_views) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_wrap_u
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_wrap_u(CData *cdata, SamplerState::WrapMode wrap) {
   if (cdata->_default_sampler.get_wrap_u() != wrap) {
@@ -5279,11 +6965,9 @@ do_set_wrap_u(CData *cdata, SamplerState::WrapMode wrap) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_wrap_v
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_wrap_v(CData *cdata, SamplerState::WrapMode wrap) {
   if (cdata->_default_sampler.get_wrap_v() != wrap) {
@@ -5292,11 +6976,9 @@ do_set_wrap_v(CData *cdata, SamplerState::WrapMode wrap) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_wrap_w
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_wrap_w(CData *cdata, SamplerState::WrapMode wrap) {
   if (cdata->_default_sampler.get_wrap_w() != wrap) {
@@ -5305,11 +6987,9 @@ do_set_wrap_w(CData *cdata, SamplerState::WrapMode wrap) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_minfilter
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_minfilter(CData *cdata, SamplerState::FilterType filter) {
   if (cdata->_default_sampler.get_minfilter() != filter) {
@@ -5318,11 +6998,9 @@ do_set_minfilter(CData *cdata, SamplerState::FilterType filter) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_magfilter
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_magfilter(CData *cdata, SamplerState::FilterType filter) {
   if (cdata->_default_sampler.get_magfilter() != filter) {
@@ -5331,11 +7009,9 @@ do_set_magfilter(CData *cdata, SamplerState::FilterType filter) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_anisotropic_degree
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_anisotropic_degree(CData *cdata, int anisotropic_degree) {
   if (cdata->_default_sampler.get_anisotropic_degree() != anisotropic_degree) {
@@ -5344,11 +7020,9 @@ do_set_anisotropic_degree(CData *cdata, int anisotropic_degree) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_border_color
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_border_color(CData *cdata, const LColor &color) {
   if (cdata->_default_sampler.get_border_color() != color) {
@@ -5357,11 +7031,9 @@ do_set_border_color(CData *cdata, const LColor &color) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_compression
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_compression(CData *cdata, Texture::CompressionMode compression) {
   if (cdata->_compression != compression) {
@@ -5373,20 +7045,17 @@ do_set_compression(CData *cdata, Texture::CompressionMode compression) {
       bool has_ram_image_compression = (cdata->_ram_image_compression != CM_off);
       if (has_compression != has_ram_image_compression ||
           has_compression) {
-        // Reload if we're turning compression on or off, or if we're
-        // changing the compression mode to a different kind of
-        // compression.
+        // Reload if we're turning compression on or off, or if we're changing
+        // the compression mode to a different kind of compression.
         do_reload(cdata);
       }
     }
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_quality_level
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_quality_level(CData *cdata, Texture::QualityLevel quality_level) {
   if (cdata->_quality_level != quality_level) {
@@ -5395,11 +7064,9 @@ do_set_quality_level(CData *cdata, Texture::QualityLevel quality_level) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_has_compression
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Texture::
 do_has_compression(const CData *cdata) const {
   if (cdata->_compression == CM_default) {
@@ -5409,44 +7076,36 @@ do_has_compression(const CData *cdata) const {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_has_ram_image
-//       Access: Protected, Virtual
-//  Description: The protected implementation of has_ram_image().
-//               Assumes the lock is already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * The protected implementation of has_ram_image(). Assumes the lock is
+ * already held.
+ */
 bool Texture::
 do_has_ram_image(const CData *cdata) const {
   return !cdata->_ram_images.empty() && !cdata->_ram_images[0]._image.empty();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_has_uncompressed_ram_image
-//       Access: Protected, Virtual
-//  Description: The protected implementation of
-//               has_uncompressed_ram_image().  Assumes the lock is
-//               already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * The protected implementation of has_uncompressed_ram_image().  Assumes the
+ * lock is already held.
+ */
 bool Texture::
 do_has_uncompressed_ram_image(const CData *cdata) const {
   return !cdata->_ram_images.empty() && !cdata->_ram_images[0]._image.empty() && cdata->_ram_image_compression == CM_off;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_get_ram_image
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPTA_uchar Texture::
 do_get_ram_image(CData *cdata) {
   if (!do_has_ram_image(cdata) && do_can_reload(cdata)) {
     do_reload_ram_image(cdata, true);
 
     if (do_has_ram_image(cdata)) {
-      // Normally, we don't update the cdata->_modified semaphores in a do_blah
-      // method, but we'll make an exception in this case, because it's
-      // easiest to modify these here, and only when we know it's
-      // needed.
+      // Normally, we don't update the cdata->_modified semaphores in a
+      // do_blah method, but we'll make an exception in this case, because
+      // it's easiest to modify these here, and only when we know it's needed.
       cdata->inc_image_modified();
       cdata->inc_properties_modified();
     }
@@ -5459,16 +7118,14 @@ do_get_ram_image(CData *cdata) {
   return cdata->_ram_images[0]._image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_get_uncompressed_ram_image
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPTA_uchar Texture::
 do_get_uncompressed_ram_image(CData *cdata) {
   if (!cdata->_ram_images.empty() && cdata->_ram_image_compression != CM_off) {
-    // We have an image in-ram, but it's compressed.  Try to
-    // uncompress it first.
+    // We have an image in-ram, but it's compressed.  Try to uncompress it
+    // first.
     if (do_uncompress_ram_image(cdata)) {
       if (gobj_cat.is_debug()) {
         gobj_cat.debug()
@@ -5499,34 +7156,29 @@ do_get_uncompressed_ram_image(CData *cdata) {
   return cdata->_ram_images[0]._image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::get_ram_image_as
-//       Access: Published
-//  Description: Returns the uncompressed system-RAM image data
-//               associated with the texture. Rather than
-//               just returning a pointer to the data, like
-//               get_uncompressed_ram_image, this function first
-//               processes the data and reorders the components
-//               using the specified format string, and places these
-//               into a new char array. The 'format' argument should
-//               specify in which order the components of the texture
-//               must be. For example, valid format strings are
-//               "RGBA", "GA", "ABRG" or "AAA". A component can
-//               also be written as "0" or "1", which means an
-//               empty/black or a full/white channel, respectively.
-//               This function is particularly useful to
-//               copy an image in-memory to a different library
-//               (for example, PIL or wxWidgets) that require
-//               a different component order than Panda's internal
-//               format, BGRA. Note, however, that this conversion
-//               can still be too slow if you want to do it every
-//               frame, and should thus be avoided for that purpose.
-//               The only requirement for the reordering is that
-//               an uncompressed image must be available. If the
-//               RAM image is compressed, it will attempt to re-load
-//               the texture from disk, if it doesn't find an
-//               uncompressed image there, it will return NULL.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the uncompressed system-RAM image data associated with the texture.
+ * Rather than just returning a pointer to the data, like
+ * get_uncompressed_ram_image, this function first processes the data and
+ * reorders the components using the specified format string, and places these
+ * into a new char array.
+ *
+ * The 'format' argument should specify in which order the components of the
+ * texture must be.  For example, valid format strings are "RGBA", "GA",
+ * "ABRG" or "AAA".  A component can also be written as "0" or "1", which
+ * means an empty/black or a full/white channel, respectively.
+ *
+ * This function is particularly useful to copy an image in-memory to a
+ * different library (for example, PIL or wxWidgets) that require a different
+ * component order than Panda's internal format, BGRA. Note, however, that
+ * this conversion can still be too slow if you want to do it every frame, and
+ * should thus be avoided for that purpose.
+ *
+ * The only requirement for the reordering is that an uncompressed image must
+ * be available.  If the RAM image is compressed, it will attempt to re-load
+ * the texture from disk, if it doesn't find an uncompressed image there, it
+ * will return NULL.
+ */
 CPTA_uchar Texture::
 get_ram_image_as(const string &requested_format) {
   CDWriter cdata(_cycler, false);
@@ -5551,102 +7203,185 @@ get_ram_image_as(const string &requested_format) {
     return CPTA_uchar(data);
   }
 
+  // Check if we have an alpha channel, and remember which channel we use.
+  int alpha = -1;
+  if (Texture::has_alpha(cdata->_format)) {
+    alpha = cdata->_num_components - 1;
+  }
+
+  // Validate the format beforehand.
+  for (size_t i = 0; i < format.size(); ++i) {
+    if (format[i] != 'B' && format[i] != 'G' && format[i] != 'R' &&
+        format[i] != 'A' && format[i] != '0' && format[i] != '1') {
+      gobj_cat.error() << "Unexpected component character '"
+        << format[i] << "', expected one of RGBA01!\n";
+      return CPTA_uchar(get_class_type());
+    }
+  }
+
   // Create a new empty array that can hold our image.
   PTA_uchar newdata = PTA_uchar::empty_array(imgsize * format.size() * cdata->_component_width, get_class_type());
 
   // These ifs are for optimization of commonly used image types.
-  if (format == "RGBA" && cdata->_num_components == 4 && cdata->_component_width == 1) {
-    imgsize *= 4;
-    for (int p = 0; p < imgsize; p += 4) {
-      newdata[p    ] = data[p + 2];
-      newdata[p + 1] = data[p + 1];
-      newdata[p + 2] = data[p    ];
-      newdata[p + 3] = data[p + 3];
-    }
-    return newdata;
-  }
-  if (format == "RGB" && cdata->_num_components == 3 && cdata->_component_width == 1) {
-    imgsize *= 3;
-    for (int p = 0; p < imgsize; p += 3) {
-      newdata[p    ] = data[p + 2];
-      newdata[p + 1] = data[p + 1];
-      newdata[p + 2] = data[p    ];
-    }
-    return newdata;
-  }
-  if (format == "A" && cdata->_component_width == 1 && cdata->_num_components != 3) {
-    // We can generally rely on alpha to be the last component.
-    int component = cdata->_num_components - 1;
-    for (int p = 0; p < imgsize; ++p) {
-      newdata[p] = data[component];
-    }
-    return newdata;
-  }
   if (cdata->_component_width == 1) {
+    if (format == "RGBA" && cdata->_num_components == 4) {
+      const uint32_t *src = (const uint32_t *)data.p();
+      uint32_t *dst = (uint32_t *)newdata.p();
+
+      for (int p = 0; p < imgsize; ++p) {
+        uint32_t v = *src++;
+        *dst++ = ((v & 0xff00ff00u)) |
+                 ((v & 0x00ff0000u) >> 16) |
+                 ((v & 0x000000ffu) << 16);
+      }
+      return newdata;
+    }
+    if (format == "RGB" && cdata->_num_components == 4) {
+      const uint32_t *src = (const uint32_t *)data.p();
+      uint32_t *dst = (uint32_t *)newdata.p();
+
+      // Convert blocks of 4 pixels at a time, so that we can treat both the
+      // source and destination as 32-bit integers.
+      int blocks = imgsize >> 2;
+      for (int i = 0; i < blocks; ++i) {
+        uint32_t v0 = *src++;
+        uint32_t v1 = *src++;
+        uint32_t v2 = *src++;
+        uint32_t v3 = *src++;
+        *dst++ = ((v0 & 0x00ff0000u) >> 16) |
+                 ((v0 & 0x0000ff00u)) |
+                 ((v0 & 0x000000ffu) << 16) |
+                 ((v1 & 0x00ff0000u) << 8);
+        *dst++ = ((v1 & 0x0000ff00u) >> 8) |
+                 ((v1 & 0x000000ffu) << 8) |
+                 ((v2 & 0x00ff0000u)) |
+                 ((v2 & 0x0000ff00u) << 16);
+        *dst++ = ((v2 & 0x000000ffu)) |
+                 ((v3 & 0x00ff0000u) >> 8) |
+                 ((v3 & 0x0000ff00u) << 8) |
+                 ((v3 & 0x000000ffu) << 24);
+      }
+
+      // If the image size wasn't a multiple of 4, we may have a handful of
+      // pixels left over.  Convert those the slower way.
+      uint8_t *tail = (uint8_t *)dst;
+      for (int i = (imgsize & ~0x3); i < imgsize; ++i) {
+        uint32_t v = *src++;
+        *tail++ = (v & 0x00ff0000u) >> 16;
+        *tail++ = (v & 0x0000ff00u) >> 8;
+        *tail++ = (v & 0x000000ffu);
+      }
+      return newdata;
+    }
+    if (format == "BGR" && cdata->_num_components == 4) {
+      const uint32_t *src = (const uint32_t *)data.p();
+      uint32_t *dst = (uint32_t *)newdata.p();
+
+      // Convert blocks of 4 pixels at a time, so that we can treat both the
+      // source and destination as 32-bit integers.
+      int blocks = imgsize >> 2;
+      for (int i = 0; i < blocks; ++i) {
+        uint32_t v0 = *src++;
+        uint32_t v1 = *src++;
+        uint32_t v2 = *src++;
+        uint32_t v3 = *src++;
+        *dst++ = (v0 & 0x00ffffffu) | ((v1 & 0x000000ffu) << 24);
+        *dst++ = ((v1 & 0x00ffff00u) >> 8) |  ((v2 & 0x0000ffffu) << 16);
+        *dst++ = ((v2 & 0x00ff0000u) >> 16) | ((v3 & 0x00ffffffu) << 8);
+      }
+
+      // If the image size wasn't a multiple of 4, we may have a handful of
+      // pixels left over.  Convert those the slower way.
+      uint8_t *tail = (uint8_t *)dst;
+      for (int i = (imgsize & ~0x3); i < imgsize; ++i) {
+        uint32_t v = *src++;
+        *tail++ = (v & 0x000000ffu);
+        *tail++ = (v & 0x0000ff00u) >> 8;
+        *tail++ = (v & 0x00ff0000u) >> 16;
+      }
+      return newdata;
+    }
+    const uint8_t *src = (const uint8_t *)data.p();
+    uint8_t *dst = (uint8_t *)newdata.p();
+
+    if (format == "RGB" && cdata->_num_components == 3) {
+      for (int i = 0; i < imgsize; ++i) {
+        *dst++ = src[2];
+        *dst++ = src[1];
+        *dst++ = src[0];
+        src += 3;
+      }
+      return newdata;
+    }
+    if (format == "A" && cdata->_num_components != 3) {
+      // We can generally rely on alpha to be the last component.
+      for (int p = 0; p < imgsize; ++p) {
+        dst[p] = src[alpha];
+        src += cdata->_num_components;
+      }
+      return newdata;
+    }
+    // Fallback case for other 8-bit-per-channel formats.
     for (int p = 0; p < imgsize; ++p) {
-      for (uchar s = 0; s < format.size(); ++s) {
-        signed char component = -1;
-        if (format.at(s) == 'B' || (cdata->_num_components <= 2 && format.at(s) != 'A')) {
-          component = 0;
-        } else if (format.at(s) == 'G') {
-          component = 1;
-        } else if (format.at(s) == 'R') {
-          component = 2;
-        } else if (format.at(s) == 'A') {
-          nassertr(cdata->_num_components != 3, CPTA_uchar(get_class_type()));
-          component = cdata->_num_components - 1;
-        } else if (format.at(s) == '0') {
-          newdata[p * format.size() + s] = 0x00;
-        } else if (format.at(s) == '1') {
-          newdata[p * format.size() + s] = 0xff;
+      for (size_t i = 0; i < format.size(); ++i) {
+        if (format[i] == 'B' || (cdata->_num_components <= 2 && format[i] != 'A')) {
+          *dst++ = src[0];
+        } else if (format[i] == 'G') {
+          *dst++ = src[1];
+        } else if (format[i] == 'R') {
+          *dst++ = src[2];
+        } else if (format[i] == 'A') {
+          if (alpha >= 0) {
+            *dst++ = src[alpha];
+          } else {
+            *dst++ = 0xff;
+          }
+        } else if (format[i] == '1') {
+          *dst++ = 0xff;
         } else {
-          gobj_cat.error() << "Unexpected component character '"
-            << format.at(s) << "', expected one of RGBA!\n";
-          return CPTA_uchar(get_class_type());
-        }
-        if (component >= 0) {
-          newdata[p * format.size() + s] = data[p * cdata->_num_components + component];
+          *dst++ = 0x00;
         }
       }
+      src += cdata->_num_components;
     }
     return newdata;
   }
+
+  // The slow and general case.
   for (int p = 0; p < imgsize; ++p) {
-    for (uchar s = 0; s < format.size(); ++s) {
-      signed char component = -1;
-      if (format.at(s) == 'B' || (cdata->_num_components <= 2 && format.at(s) != 'A')) {
+    for (size_t i = 0; i < format.size(); ++i) {
+      int component = 0;
+      if (format[i] == 'B' || (cdata->_num_components <= 2 && format[i] != 'A')) {
         component = 0;
-      } else if (format.at(s) == 'G') {
+      } else if (format[i] == 'G') {
         component = 1;
-      } else if (format.at(s) == 'R') {
+      } else if (format[i] == 'R') {
         component = 2;
-      } else if (format.at(s) == 'A') {
-        nassertr(cdata->_num_components != 3, CPTA_uchar(get_class_type()));
-        component = cdata->_num_components - 1;
-      } else if (format.at(s) == '0') {
-        memset((void*)(newdata + (p * format.size() + s) * cdata->_component_width),  0, cdata->_component_width);
-      } else if (format.at(s) == '1') {
-        memset((void*)(newdata + (p * format.size() + s) * cdata->_component_width), -1, cdata->_component_width);
+      } else if (format[i] == 'A') {
+        if (alpha >= 0) {
+          component = alpha;
+        } else {
+          memset((void*)(newdata + (p * format.size() + i) * cdata->_component_width), -1, cdata->_component_width);
+          continue;
+        }
+      } else if (format[i] == '1') {
+        memset((void*)(newdata + (p * format.size() + i) * cdata->_component_width), -1, cdata->_component_width);
+        continue;
       } else {
-        gobj_cat.error() << "Unexpected component character '"
-          << format.at(s) << "', expected one of RGBA!\n";
-        return CPTA_uchar(get_class_type());
+        memset((void*)(newdata + (p * format.size() + i) * cdata->_component_width),  0, cdata->_component_width);
+        continue;
       }
-      if (component >= 0) {
-        memcpy((void*)(newdata + (p * format.size() + s) * cdata->_component_width),
-               (void*)(data + (p * cdata->_num_components + component) * cdata->_component_width),
-               cdata->_component_width);
-      }
+      memcpy((void*)(newdata + (p * format.size() + i) * cdata->_component_width),
+             (void*)(data + (p * cdata->_num_components + component) * cdata->_component_width),
+             cdata->_component_width);
     }
   }
   return newdata;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_simple_ram_image
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_simple_ram_image(CData *cdata, CPTA_uchar image, int x_size, int y_size) {
   nassertv(cdata->_texture_type == TT_2d_texture);
@@ -5657,18 +7392,19 @@ do_set_simple_ram_image(CData *cdata, CPTA_uchar image, int x_size, int y_size) 
   cdata->_simple_y_size = y_size;
   cdata->_simple_ram_image._image = image.cast_non_const();
   cdata->_simple_ram_image._page_size = image.size();
-  cdata->_simple_image_date_generated = (PN_int32)time(NULL);
+  cdata->_simple_image_date_generated = (int32_t)time(NULL);
   cdata->inc_simple_image_modified();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_get_expected_num_mipmap_levels
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 int Texture::
 do_get_expected_num_mipmap_levels(const CData *cdata) const {
-  int size = max(cdata->_x_size, max(cdata->_y_size, cdata->_z_size));
+  int size = max(cdata->_x_size, cdata->_y_size);
+  if (cdata->_texture_type == Texture::TT_3d_texture) {
+    size = max(size, cdata->_z_size);
+  }
   int count = 1;
   while (size > 1) {
     size >>= 1;
@@ -5677,11 +7413,9 @@ do_get_expected_num_mipmap_levels(const CData *cdata) const {
   return count;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_get_ram_mipmap_page_size
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 size_t Texture::
 do_get_ram_mipmap_page_size(const CData *cdata, int n) const {
   if (cdata->_ram_image_compression != CM_off) {
@@ -5694,11 +7428,9 @@ do_get_ram_mipmap_page_size(const CData *cdata, int n) const {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_get_expected_mipmap_x_size
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 int Texture::
 do_get_expected_mipmap_x_size(const CData *cdata, int n) const {
   int size = max(cdata->_x_size, 1);
@@ -5709,11 +7441,9 @@ do_get_expected_mipmap_x_size(const CData *cdata, int n) const {
   return size;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_get_expected_mipmap_y_size
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 int Texture::
 do_get_expected_mipmap_y_size(const CData *cdata, int n) const {
   int size = max(cdata->_y_size, 1);
@@ -5724,16 +7454,14 @@ do_get_expected_mipmap_y_size(const CData *cdata, int n) const {
   return size;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_get_expected_mipmap_z_size
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 int Texture::
 do_get_expected_mipmap_z_size(const CData *cdata, int n) const {
-  // 3-D textures have a different number of pages per each mipmap
-  // level.  Other kinds of textures--especially, cube map
-  // textures--always have the same.
+  // 3-D textures have a different number of pages per each mipmap level.
+  // Other kinds of textures--especially, cube map textures--always have the
+  // same.
   if (cdata->_texture_type == Texture::TT_3d_texture) {
     int size = max(cdata->_z_size, 1);
     while (n > 0 && size > 1) {
@@ -5747,11 +7475,9 @@ do_get_expected_mipmap_z_size(const CData *cdata, int n) const {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_clear_simple_ram_image
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_clear_simple_ram_image(CData *cdata) {
   cdata->_simple_x_size = 0;
@@ -5760,17 +7486,15 @@ do_clear_simple_ram_image(CData *cdata) {
   cdata->_simple_ram_image._page_size = 0;
   cdata->_simple_image_date_generated = 0;
 
-  // We allow this exception: we update the _simple_image_modified
-  // here, since no one really cares much about that anyway, and it's
-  // convenient to do it here.
+  // We allow this exception: we update the _simple_image_modified here, since
+  // no one really cares much about that anyway, and it's convenient to do it
+  // here.
   cdata->inc_simple_image_modified();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_clear_ram_mipmap_images
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_clear_ram_mipmap_images(CData *cdata) {
   if (!cdata->_ram_images.empty()) {
@@ -5778,13 +7502,13 @@ do_clear_ram_mipmap_images(CData *cdata) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_generate_ram_mipmap_images
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ * Generates the RAM mipmap images for this texture, first uncompressing it as
+ * required.  Will recompress the image if it was originally compressed,
+ * unless allow_recompress is true.
+ */
 void Texture::
-do_generate_ram_mipmap_images(CData *cdata) {
+do_generate_ram_mipmap_images(CData *cdata, bool allow_recompress) {
   nassertv(do_has_ram_image(cdata));
 
   if (do_get_expected_num_mipmap_levels(cdata) == 1) {
@@ -5796,16 +7520,21 @@ do_generate_ram_mipmap_images(CData *cdata) {
   CompressionMode orig_compression_mode = CM_off;
 
   if (cdata->_ram_image_compression != CM_off) {
-    // The RAM image is compressed.  This means we need to uncompress
-    // it in order to generate mipmap images.  Save the original
-    // first, to avoid lossy recompression.
+    // The RAM image is compressed.  This means we need to uncompress it in
+    // order to generate mipmap images.  Save the original first, to avoid
+    // lossy recompression.
     orig_compressed_image = cdata->_ram_images[0];
     orig_compression_mode = cdata->_ram_image_compression;
 
     // Now try to get the uncompressed source image.
     do_get_uncompressed_ram_image(cdata);
 
-    nassertv(cdata->_ram_image_compression == CM_off);
+    if (cdata->_ram_image_compression != CM_off) {
+      gobj_cat.error()
+        << "Cannot generate mipmap levels for image with compression "
+        << cdata->_ram_image_compression << "\n";
+      return;
+    }
   }
 
   do_clear_ram_mipmap_images(cdata);
@@ -5846,12 +7575,12 @@ do_generate_ram_mipmap_images(CData *cdata) {
     }
   }
 
-  if (orig_compression_mode != CM_off) {
-    // Now attempt to recompress the mipmap images according to the
-    // original compression mode.  We don't need to bother compressing
-    // the first image (it was already compressed, after all), so
-    // temporarily remove it from the top of the mipmap stack, and
-    // compress all of the rest of them instead.
+  if (orig_compression_mode != CM_off && allow_recompress) {
+    // Now attempt to recompress the mipmap images according to the original
+    // compression mode.  We don't need to bother compressing the first image
+    // (it was already compressed, after all), so temporarily remove it from
+    // the top of the mipmap stack, and compress all of the rest of them
+    // instead.
     nassertv(cdata->_ram_images.size() > 1);
     int l0_x_size = cdata->_x_size;
     int l0_y_size = cdata->_y_size;
@@ -5865,6 +7594,11 @@ do_generate_ram_mipmap_images(CData *cdata) {
     bool success = do_compress_ram_image(cdata, orig_compression_mode, QL_default, NULL);
     // Now restore the toplevel image.
     if (success) {
+      if (gobj_cat.is_debug()) {
+        gobj_cat.debug()
+          << "Compressed " << get_name() << " generated mipmaps with "
+          << cdata->_ram_image_compression << "\n";
+      }
       cdata->_ram_images.insert(cdata->_ram_images.begin(), orig_compressed_image);
     } else {
       cdata->_ram_images.insert(cdata->_ram_images.begin(), uncompressed_image);
@@ -5875,11 +7609,9 @@ do_generate_ram_mipmap_images(CData *cdata) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_set_pad_size
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::
 do_set_pad_size(CData *cdata, int x, int y, int z) {
   if (x > cdata->_x_size) {
@@ -5897,25 +7629,19 @@ do_set_pad_size(CData *cdata, int x, int y, int z) {
   cdata->_pad_z_size = z;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_can_reload
-//       Access: Protected, Virtual
-//  Description: Returns true if we can safely call
-//               do_reload_ram_image() in order to make the image
-//               available, or false if we shouldn't do this (because
-//               we know from a priori knowledge that it wouldn't work
-//               anyway).
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if we can safely call do_reload_ram_image() in order to make
+ * the image available, or false if we shouldn't do this (because we know from
+ * a priori knowledge that it wouldn't work anyway).
+ */
 bool Texture::
 do_can_reload(const CData *cdata) const {
   return (cdata->_loaded_from_image && !cdata->_fullpath.empty());
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_reload
-//       Access: Protected
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Texture::
 do_reload(CData *cdata) {
   if (do_can_reload(cdata)) {
@@ -5933,37 +7659,29 @@ do_reload(CData *cdata) {
   return false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_has_bam_rawdata
-//       Access: Protected, Virtual
-//  Description: Returns true if there is a rawdata image that we have
-//               available to write to the bam stream.  For a normal
-//               Texture, this is the same thing as
-//               do_has_ram_image(), but a movie texture might define
-//               it differently.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if there is a rawdata image that we have available to write to
+ * the bam stream.  For a normal Texture, this is the same thing as
+ * do_has_ram_image(), but a movie texture might define it differently.
+ */
 bool Texture::
 do_has_bam_rawdata(const CData *cdata) const {
   return do_has_ram_image(cdata);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_get_bam_rawdata
-//       Access: Protected, Virtual
-//  Description: If do_has_bam_rawdata() returned false, this attempts
-//               to reload the rawdata image if possible.
-////////////////////////////////////////////////////////////////////
+/**
+ * If do_has_bam_rawdata() returned false, this attempts to reload the rawdata
+ * image if possible.
+ */
 void Texture::
 do_get_bam_rawdata(CData *cdata) {
   do_get_ram_image(cdata);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::convert_from_pnmimage
-//       Access: Private, Static
-//  Description: Internal method to convert pixel data from the
-//               indicated PNMImage into the given ram_image.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to convert pixel data from the indicated PNMImage into the
+ * given ram_image.
+ */
 void Texture::
 convert_from_pnmimage(PTA_uchar &image, size_t page_size,
                       int row_stride, int x, int y, int z,
@@ -5995,31 +7713,90 @@ convert_from_pnmimage(PTA_uchar &image, size_t page_size,
   }
 
   if (maxval == 255 && component_width == 1) {
-    // Most common case: one byte per pixel, and the source image
-    // shows a maxval of 255.  No scaling is necessary.
-    for (int j = y_size-1; j >= 0; j--) {
-      for (int i = 0; i < x_size; i++) {
-        if (is_grayscale) {
-          store_unscaled_byte(p, pnmimage.get_gray_val(i, j));
-        } else {
-          store_unscaled_byte(p, pnmimage.get_blue_val(i, j));
-          store_unscaled_byte(p, pnmimage.get_green_val(i, j));
-          store_unscaled_byte(p, pnmimage.get_red_val(i, j));
+    // Most common case: one byte per pixel, and the source image shows a
+    // maxval of 255.  No scaling is necessary.  Because this is such a common
+    // case, we break it out per component for best performance.
+    switch (num_components) {
+    case 1:
+      for (int j = y_size-1; j >= 0; j--) {
+        xel *row = pnmimage.row(j);
+        for (int i = 0; i < x_size; i++) {
+          *p++ = (uchar)PPM_GETB(row[i]);
         }
-        if (has_alpha) {
-          if (img_has_alpha) {
-            store_unscaled_byte(p, pnmimage.get_alpha_val(i, j));
-          } else {
-            store_unscaled_byte(p, 255);
+        p += row_skip;
+      }
+      break;
+
+    case 2:
+      if (img_has_alpha) {
+        for (int j = y_size-1; j >= 0; j--) {
+          xel *row = pnmimage.row(j);
+          xelval *alpha_row = pnmimage.alpha_row(j);
+          for (int i = 0; i < x_size; i++) {
+            *p++ = (uchar)PPM_GETB(row[i]);
+            *p++ = (uchar)alpha_row[i];
           }
+          p += row_skip;
+        }
+      } else {
+        for (int j = y_size-1; j >= 0; j--) {
+          xel *row = pnmimage.row(j);
+          for (int i = 0; i < x_size; i++) {
+            *p++ = (uchar)PPM_GETB(row[i]);
+            *p++ = (uchar)255;
+          }
+          p += row_skip;
         }
       }
-      p += row_skip;
+      break;
+
+    case 3:
+      for (int j = y_size-1; j >= 0; j--) {
+        xel *row = pnmimage.row(j);
+        for (int i = 0; i < x_size; i++) {
+          *p++ = (uchar)PPM_GETB(row[i]);
+          *p++ = (uchar)PPM_GETG(row[i]);
+          *p++ = (uchar)PPM_GETR(row[i]);
+        }
+        p += row_skip;
+      }
+      break;
+
+    case 4:
+      if (img_has_alpha) {
+        for (int j = y_size-1; j >= 0; j--) {
+          xel *row = pnmimage.row(j);
+          xelval *alpha_row = pnmimage.alpha_row(j);
+          for (int i = 0; i < x_size; i++) {
+            *p++ = (uchar)PPM_GETB(row[i]);
+            *p++ = (uchar)PPM_GETG(row[i]);
+            *p++ = (uchar)PPM_GETR(row[i]);
+            *p++ = (uchar)alpha_row[i];
+          }
+          p += row_skip;
+        }
+      } else {
+        for (int j = y_size-1; j >= 0; j--) {
+          xel *row = pnmimage.row(j);
+          for (int i = 0; i < x_size; i++) {
+            *p++ = (uchar)PPM_GETB(row[i]);
+            *p++ = (uchar)PPM_GETG(row[i]);
+            *p++ = (uchar)PPM_GETR(row[i]);
+            *p++ = (uchar)255;
+          }
+          p += row_skip;
+        }
+      }
+      break;
+
+    default:
+      nassertv(num_components >= 1 && num_components <= 4);
+      break;
     }
 
   } else if (maxval == 65535 && component_width == 2) {
-    // Another possible case: two bytes per pixel, and the source
-    // image shows a maxval of 65535.  Again, no scaling is necessary.
+    // Another possible case: two bytes per pixel, and the source image shows
+    // a maxval of 65535.  Again, no scaling is necessary.
     for (int j = y_size-1; j >= 0; j--) {
       for (int i = 0; i < x_size; i++) {
         if (is_grayscale) {
@@ -6041,9 +7818,9 @@ convert_from_pnmimage(PTA_uchar &image, size_t page_size,
     }
 
   } else if (component_width == 1) {
-    // A less common case: one byte per pixel, but the maxval is
-    // something other than 255.  In this case, we should scale the
-    // pixel values up to the appropriate amount.
+    // A less common case: one byte per pixel, but the maxval is something
+    // other than 255.  In this case, we should scale the pixel values up to
+    // the appropriate amount.
     double scale = 255.0 / (double)maxval;
 
     for (int j = y_size-1; j >= 0; j--) {
@@ -6067,9 +7844,8 @@ convert_from_pnmimage(PTA_uchar &image, size_t page_size,
     }
 
   } else {  // component_width == 2
-    // Another uncommon case: two bytes per pixel, and the maxval is
-    // something other than 65535.  Again, we must scale the pixel
-    // values.
+    // Another uncommon case: two bytes per pixel, and the maxval is something
+    // other than 65535.  Again, we must scale the pixel values.
     double scale = 65535.0 / (double)maxval;
 
     for (int j = y_size-1; j >= 0; j--) {
@@ -6094,12 +7870,10 @@ convert_from_pnmimage(PTA_uchar &image, size_t page_size,
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::convert_from_pfm
-//       Access: Private, Static
-//  Description: Internal method to convert pixel data from the
-//               indicated PfmFile into the given ram_image.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to convert pixel data from the indicated PfmFile into the
+ * given ram_image.
+ */
 void Texture::
 convert_from_pfm(PTA_uchar &image, size_t page_size, int z,
                  const PfmFile &pfm, int num_components, int component_width) {
@@ -6171,12 +7945,10 @@ convert_from_pfm(PTA_uchar &image, size_t page_size, int z,
   nassertv((unsigned char *)p == &image[idx] + page_size);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::convert_to_pnmimage
-//       Access: Private, Static
-//  Description: Internal method to convert pixel data to the
-//               indicated PNMImage from the given ram_image.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to convert pixel data to the indicated PNMImage from the
+ * given ram_image.
+ */
 bool Texture::
 convert_to_pnmimage(PNMImage &pnmimage, int x_size, int y_size,
                     int num_components, int component_width,
@@ -6194,17 +7966,44 @@ convert_to_pnmimage(PNMImage &pnmimage, int x_size, int y_size,
   const unsigned char *p = &image[idx];
 
   if (component_width == 1) {
-    for (int j = y_size-1; j >= 0; j--) {
-      for (int i = 0; i < x_size; i++) {
-        if (is_grayscale) {
-          pnmimage.set_gray(i, j, get_unsigned_byte(p));
-        } else {
-          pnmimage.set_blue(i, j, get_unsigned_byte(p));
-          pnmimage.set_green(i, j, get_unsigned_byte(p));
-          pnmimage.set_red(i, j, get_unsigned_byte(p));
+    if (is_grayscale) {
+      if (has_alpha) {
+        for (int j = y_size-1; j >= 0; j--) {
+          xel *row = pnmimage.row(j);
+          xelval *alpha_row = pnmimage.alpha_row(j);
+          for (int i = 0; i < x_size; i++) {
+            PPM_PUTB(row[i], *p++);
+            alpha_row[i] = *p++;
+          }
         }
-        if (has_alpha) {
-          pnmimage.set_alpha(i, j, get_unsigned_byte(p));
+      } else {
+        for (int j = y_size-1; j >= 0; j--) {
+          xel *row = pnmimage.row(j);
+          for (int i = 0; i < x_size; i++) {
+            PPM_PUTB(row[i], *p++);
+          }
+        }
+      }
+    } else {
+      if (has_alpha) {
+        for (int j = y_size-1; j >= 0; j--) {
+          xel *row = pnmimage.row(j);
+          xelval *alpha_row = pnmimage.alpha_row(j);
+          for (int i = 0; i < x_size; i++) {
+            PPM_PUTB(row[i], *p++);
+            PPM_PUTG(row[i], *p++);
+            PPM_PUTR(row[i], *p++);
+            alpha_row[i] = *p++;
+          }
+        }
+      } else {
+        for (int j = y_size-1; j >= 0; j--) {
+          xel *row = pnmimage.row(j);
+          for (int i = 0; i < x_size; i++) {
+            PPM_PUTB(row[i], *p++);
+            PPM_PUTG(row[i], *p++);
+            PPM_PUTR(row[i], *p++);
+          }
         }
       }
     }
@@ -6233,12 +8032,10 @@ convert_to_pnmimage(PNMImage &pnmimage, int x_size, int y_size,
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::convert_to_pfm
-//       Access: Private, Static
-//  Description: Internal method to convert pixel data to the
-//               indicated PfmFile from the given ram_image.
-////////////////////////////////////////////////////////////////////
+/**
+ * Internal method to convert pixel data to the indicated PfmFile from the
+ * given ram_image.
+ */
 bool Texture::
 convert_to_pfm(PfmFile &pfm, int x_size, int y_size,
                int num_components, int component_width,
@@ -6303,11 +8100,9 @@ convert_to_pfm(PfmFile &pfm, int x_size, int y_size,
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds_level_bgr8
-//       Access: Private, Static
-//  Description: Called by read_dds for a DDS file in BGR8 format.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for a DDS file in BGR8 format.
+ */
 PTA_uchar Texture::
 read_dds_level_bgr8(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
   // This is in order B, G, R.
@@ -6326,11 +8121,9 @@ read_dds_level_bgr8(Texture *tex, CData *cdata, const DDSHeader &header, int n, 
   return image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds_level_rgb8
-//       Access: Private, Static
-//  Description: Called by read_dds for a DDS file in RGB8 format.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for a DDS file in RGB8 format.
+ */
 PTA_uchar Texture::
 read_dds_level_rgb8(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
   // This is in order R, G, B.
@@ -6358,11 +8151,9 @@ read_dds_level_rgb8(Texture *tex, CData *cdata, const DDSHeader &header, int n, 
   return image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds_level_abgr8
-//       Access: Private, Static
-//  Description: Called by read_dds for a DDS file in ABGR8 format.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for a DDS file in ABGR8 format.
+ */
 PTA_uchar Texture::
 read_dds_level_abgr8(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
   // This is laid out in order R, G, B, A.
@@ -6376,9 +8167,9 @@ read_dds_level_abgr8(Texture *tex, CData *cdata, const DDSHeader &header, int n,
     unsigned char *p = image.p() + y * row_bytes;
     in.read((char *)p, row_bytes);
 
-    PN_uint32 *pw = (PN_uint32 *)p;
+    uint32_t *pw = (uint32_t *)p;
     for (int x = 0; x < x_size; ++x) {
-      PN_uint32 w = *pw;
+      uint32_t w = *pw;
 #ifdef WORDS_BIGENDIAN
       // bigendian: convert R, G, B, A to B, G, R, A.
       w = ((w & 0xff00) << 16) | ((w & 0xff000000U) >> 16) | (w & 0xff00ff);
@@ -6395,11 +8186,9 @@ read_dds_level_abgr8(Texture *tex, CData *cdata, const DDSHeader &header, int n,
   return image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds_level_rgba8
-//       Access: Private, Static
-//  Description: Called by read_dds for a DDS file in RGBA8 format.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for a DDS file in RGBA8 format.
+ */
 PTA_uchar Texture::
 read_dds_level_rgba8(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
   // This is actually laid out in order B, G, R, A.
@@ -6418,12 +8207,64 @@ read_dds_level_rgba8(Texture *tex, CData *cdata, const DDSHeader &header, int n,
   return image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds_level_generic_uncompressed
-//       Access: Private, Static
-//  Description: Called by read_dds for a DDS file whose format isn't
-//               one we've specifically optimized.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for a DDS file in ABGR16 format.
+ */
+PTA_uchar Texture::
+read_dds_level_abgr16(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
+  // This is laid out in order R, G, B, A.
+  int x_size = tex->do_get_expected_mipmap_x_size(cdata, n);
+  int y_size = tex->do_get_expected_mipmap_y_size(cdata, n);
+
+  size_t size = tex->do_get_expected_ram_mipmap_page_size(cdata, n);
+  size_t row_bytes = x_size * 8;
+  PTA_uchar image = PTA_uchar::empty_array(size);
+  for (int y = y_size - 1; y >= 0; --y) {
+    unsigned char *p = image.p() + y * row_bytes;
+    in.read((char *)p, row_bytes);
+
+    uint16_t *pw = (uint16_t *)p;
+    for (int x = 0; x < x_size; ++x) {
+      swap(pw[0], pw[2]);
+      pw += 4;
+    }
+    nassertr((unsigned char *)pw <= image.p() + size, PTA_uchar());
+  }
+
+  return image;
+}
+
+/**
+ * Called by read_dds for a DDS file in ABGR32 format.
+ */
+PTA_uchar Texture::
+read_dds_level_abgr32(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
+  // This is laid out in order R, G, B, A.
+  int x_size = tex->do_get_expected_mipmap_x_size(cdata, n);
+  int y_size = tex->do_get_expected_mipmap_y_size(cdata, n);
+
+  size_t size = tex->do_get_expected_ram_mipmap_page_size(cdata, n);
+  size_t row_bytes = x_size * 16;
+  PTA_uchar image = PTA_uchar::empty_array(size);
+  for (int y = y_size - 1; y >= 0; --y) {
+    unsigned char *p = image.p() + y * row_bytes;
+    in.read((char *)p, row_bytes);
+
+    uint32_t *pw = (uint32_t *)p;
+    for (int x = 0; x < x_size; ++x) {
+      swap(pw[0], pw[2]);
+      pw += 4;
+    }
+    nassertr((unsigned char *)pw <= image.p() + size, PTA_uchar());
+  }
+
+  return image;
+}
+
+/**
+ * Called by read_dds for a DDS file whose format isn't one we've specifically
+ * optimized.
+ */
 PTA_uchar Texture::
 read_dds_level_generic_uncompressed(Texture *tex, CData *cdata, const DDSHeader &header,
                                     int n, istream &in) {
@@ -6432,11 +8273,10 @@ read_dds_level_generic_uncompressed(Texture *tex, CData *cdata, const DDSHeader 
 
   int pitch = (x_size * header.pf.rgb_bitcount) / 8;
 
-  // MS says the pitch can be supplied in the header file and must be
-  // DWORD aligned, but this appears to apply to level 0 mipmaps only
-  // (where it almost always will be anyway).  Other mipmap levels
-  // seem to be tightly packed, but there isn't a separate pitch for
-  // each mipmap level.  Weird.
+  // MS says the pitch can be supplied in the header file and must be DWORD
+  // aligned, but this appears to apply to level 0 mipmaps only (where it
+  // almost always will be anyway).  Other mipmap levels seem to be tightly
+  // packed, but there isn't a separate pitch for each mipmap level.  Weird.
   if (n == 0) {
     pitch = ((pitch + 3) / 4) * 4;
     if (header.dds_flags & DDSD_PITCH) {
@@ -6453,15 +8293,15 @@ read_dds_level_generic_uncompressed(Texture *tex, CData *cdata, const DDSHeader 
   unsigned int b_mask = header.pf.b_mask;
   unsigned int a_mask = header.pf.a_mask;
 
-  // Determine the number of bits to shift each mask to the right so
-  // that the lowest on bit is at bit 0.
+  // Determine the number of bits to shift each mask to the right so that the
+  // lowest on bit is at bit 0.
   int r_shift = get_lowest_on_bit(r_mask);
   int g_shift = get_lowest_on_bit(g_mask);
   int b_shift = get_lowest_on_bit(b_mask);
   int a_shift = get_lowest_on_bit(a_mask);
 
-  // Then determine the scale factor required to raise the highest
-  // color value to 0xff000000.
+  // Then determine the scale factor required to raise the highest color value
+  // to 0xff000000.
   unsigned int r_scale = 0;
   if (r_mask != 0) {
     r_scale = 0xff000000 / (r_mask >> r_shift);
@@ -6497,8 +8337,7 @@ read_dds_level_generic_uncompressed(Texture *tex, CData *cdata, const DDSHeader 
         shift += 8;
       }
 
-      // Then break apart that value into its R, G, B, and maybe A
-      // components.
+      // Then break apart that value into its R, G, B, and maybe A components.
       unsigned int r = (((pixel & r_mask) >> r_shift) * r_scale) >> 24;
       unsigned int g = (((pixel & g_mask) >> g_shift) * g_scale) >> 24;
       unsigned int b = (((pixel & b_mask) >> b_shift) * b_scale) >> 24;
@@ -6521,12 +8360,10 @@ read_dds_level_generic_uncompressed(Texture *tex, CData *cdata, const DDSHeader 
   return image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds_level_luminance_uncompressed
-//       Access: Private, Static
-//  Description: Called by read_dds for a DDS file in uncompressed
-//               luminance or luminance-alpha format.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for a DDS file in uncompressed luminance or luminance-
+ * alpha format.
+ */
 PTA_uchar Texture::
 read_dds_level_luminance_uncompressed(Texture *tex, CData *cdata, const DDSHeader &header,
                                       int n, istream &in) {
@@ -6535,11 +8372,10 @@ read_dds_level_luminance_uncompressed(Texture *tex, CData *cdata, const DDSHeade
 
   int pitch = (x_size * header.pf.rgb_bitcount) / 8;
 
-  // MS says the pitch can be supplied in the header file and must be
-  // DWORD aligned, but this appears to apply to level 0 mipmaps only
-  // (where it almost always will be anyway).  Other mipmap levels
-  // seem to be tightly packed, but there isn't a separate pitch for
-  // each mipmap level.  Weird.
+  // MS says the pitch can be supplied in the header file and must be DWORD
+  // aligned, but this appears to apply to level 0 mipmaps only (where it
+  // almost always will be anyway).  Other mipmap levels seem to be tightly
+  // packed, but there isn't a separate pitch for each mipmap level.  Weird.
   if (n == 0) {
     pitch = ((pitch + 3) / 4) * 4;
     if (header.dds_flags & DDSD_PITCH) {
@@ -6554,13 +8390,13 @@ read_dds_level_luminance_uncompressed(Texture *tex, CData *cdata, const DDSHeade
   unsigned int r_mask = header.pf.r_mask;
   unsigned int a_mask = header.pf.a_mask;
 
-  // Determine the number of bits to shift each mask to the right so
-  // that the lowest on bit is at bit 0.
+  // Determine the number of bits to shift each mask to the right so that the
+  // lowest on bit is at bit 0.
   int r_shift = get_lowest_on_bit(r_mask);
   int a_shift = get_lowest_on_bit(a_mask);
 
-  // Then determine the scale factor required to raise the highest
-  // color value to 0xff000000.
+  // Then determine the scale factor required to raise the highest color value
+  // to 0xff000000.
   unsigned int r_scale = 0;
   if (r_mask != 0) {
     r_scale = 0xff000000 / (r_mask >> r_shift);
@@ -6606,21 +8442,19 @@ read_dds_level_luminance_uncompressed(Texture *tex, CData *cdata, const DDSHeade
   return image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds_level_dxt1
-//       Access: Private, Static
-//  Description: Called by read_dds for DXT1 file format.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for DXT1 file format.
+ */
 PTA_uchar Texture::
-read_dds_level_dxt1(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
+read_dds_level_bc1(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
   int x_size = tex->do_get_expected_mipmap_x_size(cdata, n);
   int y_size = tex->do_get_expected_mipmap_y_size(cdata, n);
 
   static const int div = 4;
   static const int block_bytes = 8;
 
-  // The DXT1 image is divided into num_rows x num_cols blocks, where
-  // each block represents 4x4 pixels.
+  // The DXT1 image is divided into num_rows x num_cols blocks, where each
+  // block represents 4x4 pixels.
   int num_cols = max(div, x_size) / div;
   int num_rows = max(div, y_size) / div;
   int row_length = num_cols * block_bytes;
@@ -6635,18 +8469,18 @@ read_dds_level_dxt1(Texture *tex, CData *cdata, const DDSHeader &header, int n, 
   PTA_uchar image = PTA_uchar::empty_array(linear_size);
 
   if (y_size >= 4) {
-    // We have to flip the image as we read it, because of DirectX's
-    // inverted sense of up.  That means we (a) reverse the order of the
-    // rows of blocks . . .
+    // We have to flip the image as we read it, because of DirectX's inverted
+    // sense of up.  That means we (a) reverse the order of the rows of blocks
+    // . . .
     for (int ri = num_rows - 1; ri >= 0; --ri) {
       unsigned char *p = image.p() + row_length * ri;
       in.read((char *)p, row_length);
 
       for (int ci = 0; ci < num_cols; ++ci) {
-        // . . . and (b) within each block, we reverse the 4 individual
-        // rows of 4 pixels.
-        PN_uint32 *cells = (PN_uint32 *)p;
-        PN_uint32 w = cells[1];
+        // . . . and (b) within each block, we reverse the 4 individual rows
+        // of 4 pixels.
+        uint32_t *cells = (uint32_t *)p;
+        uint32_t w = cells[1];
         w = ((w & 0xff) << 24) | ((w & 0xff00) << 8) | ((w & 0xff0000) >> 8) | ((w & 0xff000000U) >> 24);
         cells[1] = w;
 
@@ -6660,8 +8494,8 @@ read_dds_level_dxt1(Texture *tex, CData *cdata, const DDSHeader &header, int n, 
     in.read((char *)p, row_length);
 
     for (int ci = 0; ci < num_cols; ++ci) {
-      PN_uint32 *cells = (PN_uint32 *)p;
-      PN_uint32 w = cells[1];
+      uint32_t *cells = (uint32_t *)p;
+      uint32_t w = cells[1];
       w = ((w & 0xff) << 8) | ((w & 0xff00) >> 8);
       cells[1] = w;
 
@@ -6677,23 +8511,20 @@ read_dds_level_dxt1(Texture *tex, CData *cdata, const DDSHeader &header, int n, 
   return image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds_level_dxt23
-//       Access: Private, Static
-//  Description: Called by read_dds for DXT2 or DXT3 file format.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for DXT2 or DXT3 file format.
+ */
 PTA_uchar Texture::
-read_dds_level_dxt23(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
+read_dds_level_bc2(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
   int x_size = tex->do_get_expected_mipmap_x_size(cdata, n);
   int y_size = tex->do_get_expected_mipmap_y_size(cdata, n);
 
   static const int div = 4;
   static const int block_bytes = 16;
 
-  // The DXT3 image is divided into num_rows x num_cols blocks, where
-  // each block represents 4x4 pixels.  Unlike DXT1, each block
-  // consists of two 8-byte chunks, representing the alpha and color
-  // separately.
+  // The DXT3 image is divided into num_rows x num_cols blocks, where each
+  // block represents 4x4 pixels.  Unlike DXT1, each block consists of two
+  // 8-byte chunks, representing the alpha and color separately.
   int num_cols = max(div, x_size) / div;
   int num_rows = max(div, y_size) / div;
   int row_length = num_cols * block_bytes;
@@ -6708,29 +8539,29 @@ read_dds_level_dxt23(Texture *tex, CData *cdata, const DDSHeader &header, int n,
   PTA_uchar image = PTA_uchar::empty_array(linear_size);
 
   if (y_size >= 4) {
-    // We have to flip the image as we read it, because of DirectX's
-    // inverted sense of up.  That means we (a) reverse the order of the
-    // rows of blocks . . .
+    // We have to flip the image as we read it, because of DirectX's inverted
+    // sense of up.  That means we (a) reverse the order of the rows of blocks
+    // . . .
     for (int ri = num_rows - 1; ri >= 0; --ri) {
       unsigned char *p = image.p() + row_length * ri;
       in.read((char *)p, row_length);
 
       for (int ci = 0; ci < num_cols; ++ci) {
-        // . . . and (b) within each block, we reverse the 4 individual
-        // rows of 4 pixels.
-        PN_uint32 *cells = (PN_uint32 *)p;
+        // . . . and (b) within each block, we reverse the 4 individual rows
+        // of 4 pixels.
+        uint32_t *cells = (uint32_t *)p;
 
         // Alpha.  The block is four 16-bit words of pixel data.
-        PN_uint32 w0 = cells[0];
-        PN_uint32 w1 = cells[1];
+        uint32_t w0 = cells[0];
+        uint32_t w1 = cells[1];
         w0 = ((w0 & 0xffff) << 16) | ((w0 & 0xffff0000U) >> 16);
         w1 = ((w1 & 0xffff) << 16) | ((w1 & 0xffff0000U) >> 16);
         cells[0] = w1;
         cells[1] = w0;
 
-        // Color.  Only the second 32-bit dword of the color block
-        // represents the pixel data.
-        PN_uint32 w = cells[3];
+        // Color.  Only the second 32-bit dword of the color block represents
+        // the pixel data.
+        uint32_t w = cells[3];
         w = ((w & 0xff) << 24) | ((w & 0xff00) << 8) | ((w & 0xff0000) >> 8) | ((w & 0xff000000U) >> 24);
         cells[3] = w;
 
@@ -6744,13 +8575,13 @@ read_dds_level_dxt23(Texture *tex, CData *cdata, const DDSHeader &header, int n,
     in.read((char *)p, row_length);
 
     for (int ci = 0; ci < num_cols; ++ci) {
-      PN_uint32 *cells = (PN_uint32 *)p;
+      uint32_t *cells = (uint32_t *)p;
 
-      PN_uint32 w0 = cells[0];
+      uint32_t w0 = cells[0];
       w0 = ((w0 & 0xffff) << 16) | ((w0 & 0xffff0000U) >> 16);
       cells[0] = w0;
 
-      PN_uint32 w = cells[3];
+      uint32_t w = cells[3];
       w = ((w & 0xff) << 8) | ((w & 0xff00) >> 8);
       cells[3] = w;
 
@@ -6766,22 +8597,20 @@ read_dds_level_dxt23(Texture *tex, CData *cdata, const DDSHeader &header, int n,
   return image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::read_dds_level_dxt45
-//       Access: Private, Static
-//  Description: Called by read_dds for DXT4 or DXT5 file format.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for DXT4 or DXT5 file format.
+ */
 PTA_uchar Texture::
-read_dds_level_dxt45(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
+read_dds_level_bc3(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
   int x_size = tex->do_get_expected_mipmap_x_size(cdata, n);
   int y_size = tex->do_get_expected_mipmap_y_size(cdata, n);
 
   static const int div = 4;
   static const int block_bytes = 16;
 
-  // The DXT5 image is similar to DXT3, in that there each 4x4 block
-  // of pixels consists of an alpha block and a color block, but the
-  // layout of the alpha block is different.
+  // The DXT5 image is similar to DXT3, in that there each 4x4 block of pixels
+  // consists of an alpha block and a color block, but the layout of the alpha
+  // block is different.
   int num_cols = max(div, x_size) / div;
   int num_rows = max(div, y_size) / div;
   int row_length = num_cols * block_bytes;
@@ -6796,21 +8625,20 @@ read_dds_level_dxt45(Texture *tex, CData *cdata, const DDSHeader &header, int n,
   PTA_uchar image = PTA_uchar::empty_array(linear_size);
 
   if (y_size >= 4) {
-    // We have to flip the image as we read it, because of DirectX's
-    // inverted sense of up.  That means we (a) reverse the order of the
-    // rows of blocks . . .
+    // We have to flip the image as we read it, because of DirectX's inverted
+    // sense of up.  That means we (a) reverse the order of the rows of blocks
+    // . . .
     for (int ri = num_rows - 1; ri >= 0; --ri) {
       unsigned char *p = image.p() + row_length * ri;
       in.read((char *)p, row_length);
 
       for (int ci = 0; ci < num_cols; ++ci) {
-        // . . . and (b) within each block, we reverse the 4 individual
-        // rows of 4 pixels.
-        PN_uint32 *cells = (PN_uint32 *)p;
+        // . . . and (b) within each block, we reverse the 4 individual rows
+        // of 4 pixels.
+        uint32_t *cells = (uint32_t *)p;
 
-        // Alpha.  The block is one 16-bit word of reference values,
-        // followed by six words of pixel values, in 12-bit rows.
-        // Tricky to invert.
+        // Alpha.  The block is one 16-bit word of reference values, followed
+        // by six words of pixel values, in 12-bit rows.  Tricky to invert.
         unsigned char p2 = p[2];
         unsigned char p3 = p[3];
         unsigned char p4 = p[4];
@@ -6825,9 +8653,9 @@ read_dds_level_dxt45(Texture *tex, CData *cdata, const DDSHeader &header, int n,
         p[6] = ((p2 & 0xf) << 4) | ((p4 & 0xf0) >> 4);
         p[7] = ((p3 & 0xf) << 4) | ((p2 & 0xf0) >> 4);
 
-        // Color.  Only the second 32-bit dword of the color block
-        // represents the pixel data.
-        PN_uint32 w = cells[3];
+        // Color.  Only the second 32-bit dword of the color block represents
+        // the pixel data.
+        uint32_t w = cells[3];
         w = ((w & 0xff) << 24) | ((w & 0xff00) << 8) | ((w & 0xff0000) >> 8) | ((w & 0xff000000U) >> 24);
         cells[3] = w;
 
@@ -6841,7 +8669,7 @@ read_dds_level_dxt45(Texture *tex, CData *cdata, const DDSHeader &header, int n,
     in.read((char *)p, row_length);
 
     for (int ci = 0; ci < num_cols; ++ci) {
-      PN_uint32 *cells = (PN_uint32 *)p;
+      uint32_t *cells = (uint32_t *)p;
 
       unsigned char p2 = p[2];
       unsigned char p3 = p[3];
@@ -6851,11 +8679,11 @@ read_dds_level_dxt45(Texture *tex, CData *cdata, const DDSHeader &header, int n,
       p[3] = ((p2 & 0xf) << 4) | ((p4 & 0xf0) >> 4);
       p[4] = ((p3 & 0xf) << 4) | ((p2 & 0xf0) >> 4);
 
-      PN_uint32 w0 = cells[0];
+      uint32_t w0 = cells[0];
       w0 = ((w0 & 0xffff) << 16) | ((w0 & 0xffff0000U) >> 16);
       cells[0] = w0;
 
-      PN_uint32 w = cells[3];
+      uint32_t w = cells[3];
       w = ((w & 0xff) << 8) | ((w & 0xff00) >> 8);
       cells[3] = w;
 
@@ -6871,15 +8699,175 @@ read_dds_level_dxt45(Texture *tex, CData *cdata, const DDSHeader &header, int n,
   return image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::clear_prepared
-//       Access: Private
-//  Description: Removes the indicated PreparedGraphicsObjects table
-//               from the Texture's table, without actually releasing
-//               the texture.  This is intended to be called only from
-//               PreparedGraphicsObjects::release_texture(); it should
-//               never be called by user code.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by read_dds for ATI1 compression.
+ */
+PTA_uchar Texture::
+read_dds_level_bc4(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
+  int x_size = tex->do_get_expected_mipmap_x_size(cdata, n);
+  int y_size = tex->do_get_expected_mipmap_y_size(cdata, n);
+
+  static const int div = 4;
+  static const int block_bytes = 8;
+
+  // The ATI1 (BC4) format uses the same compression mechanism as the alpha
+  // channel of DXT5.
+  int num_cols = max(div, x_size) / div;
+  int num_rows = max(div, y_size) / div;
+  int row_length = num_cols * block_bytes;
+  int linear_size = row_length * num_rows;
+
+  if (n == 0) {
+    if (header.dds_flags & DDSD_LINEARSIZE) {
+      nassertr(linear_size == (int)header.pitch, PTA_uchar());
+    }
+  }
+
+  PTA_uchar image = PTA_uchar::empty_array(linear_size);
+
+  if (y_size >= 4) {
+    // We have to flip the image as we read it, because of DirectX's inverted
+    // sense of up.  That means we (a) reverse the order of the rows of blocks
+    // . . .
+    for (int ri = num_rows - 1; ri >= 0; --ri) {
+      unsigned char *p = image.p() + row_length * ri;
+      in.read((char *)p, row_length);
+
+      for (int ci = 0; ci < num_cols; ++ci) {
+        // . . . and (b) within each block, we reverse the 4 individual rows
+        // of 4 pixels.  The block is one 16-bit word of reference values,
+        // followed by six words of pixel values, in 12-bit rows.  Tricky to
+        // invert.
+        unsigned char p2 = p[2];
+        unsigned char p3 = p[3];
+        unsigned char p4 = p[4];
+        unsigned char p5 = p[5];
+        unsigned char p6 = p[6];
+        unsigned char p7 = p[7];
+
+        p[2] = ((p7 & 0xf) << 4) | ((p6 & 0xf0) >> 4);
+        p[3] = ((p5 & 0xf) << 4) | ((p7 & 0xf0) >> 4);
+        p[4] = ((p6 & 0xf) << 4) | ((p5 & 0xf0) >> 4);
+        p[5] = ((p4 & 0xf) << 4) | ((p3 & 0xf0) >> 4);
+        p[6] = ((p2 & 0xf) << 4) | ((p4 & 0xf0) >> 4);
+        p[7] = ((p3 & 0xf) << 4) | ((p2 & 0xf0) >> 4);
+
+        p += block_bytes;
+      }
+    }
+
+  } else if (y_size >= 2) {
+    // To invert a two-pixel high image, we just flip two rows within a cell.
+    unsigned char *p = image.p();
+    in.read((char *)p, row_length);
+
+    for (int ci = 0; ci < num_cols; ++ci) {
+      unsigned char p2 = p[2];
+      unsigned char p3 = p[3];
+      unsigned char p4 = p[4];
+
+      p[2] = ((p4 & 0xf) << 4) | ((p3 & 0xf0) >> 4);
+      p[3] = ((p2 & 0xf) << 4) | ((p4 & 0xf0) >> 4);
+      p[4] = ((p3 & 0xf) << 4) | ((p2 & 0xf0) >> 4);
+
+      p += block_bytes;
+    }
+
+  } else if (y_size >= 1) {
+    // No need to invert a one-pixel-high image.
+    unsigned char *p = image.p();
+    in.read((char *)p, row_length);
+  }
+
+  return image;
+}
+
+/**
+ * Called by read_dds for ATI2 compression.
+ */
+PTA_uchar Texture::
+read_dds_level_bc5(Texture *tex, CData *cdata, const DDSHeader &header, int n, istream &in) {
+  int x_size = tex->do_get_expected_mipmap_x_size(cdata, n);
+  int y_size = tex->do_get_expected_mipmap_y_size(cdata, n);
+
+  // The ATI2 (BC5) format uses the same compression mechanism as the ATI1
+  // (BC4) format, but doubles the channels.
+  int num_cols = max(4, x_size) / 2;
+  int num_rows = max(4, y_size) / 4;
+  int row_length = num_cols * 8;
+  int linear_size = row_length * num_rows;
+
+  if (n == 0) {
+    if (header.dds_flags & DDSD_LINEARSIZE) {
+      nassertr(linear_size == (int)header.pitch, PTA_uchar());
+    }
+  }
+
+  PTA_uchar image = PTA_uchar::empty_array(linear_size);
+
+  if (y_size >= 4) {
+    // We have to flip the image as we read it, because of DirectX's inverted
+    // sense of up.  That means we (a) reverse the order of the rows of blocks
+    // . . .
+    for (int ri = num_rows - 1; ri >= 0; --ri) {
+      unsigned char *p = image.p() + row_length * ri;
+      in.read((char *)p, row_length);
+
+      for (int ci = 0; ci < num_cols; ++ci) {
+        // . . . and (b) within each block, we reverse the 4 individual rows
+        // of 4 pixels.  The block is one 16-bit word of reference values,
+        // followed by six words of pixel values, in 12-bit rows.  Tricky to
+        // invert.
+        unsigned char p2 = p[2];
+        unsigned char p3 = p[3];
+        unsigned char p4 = p[4];
+        unsigned char p5 = p[5];
+        unsigned char p6 = p[6];
+        unsigned char p7 = p[7];
+
+        p[2] = ((p7 & 0xf) << 4) | ((p6 & 0xf0) >> 4);
+        p[3] = ((p5 & 0xf) << 4) | ((p7 & 0xf0) >> 4);
+        p[4] = ((p6 & 0xf) << 4) | ((p5 & 0xf0) >> 4);
+        p[5] = ((p4 & 0xf) << 4) | ((p3 & 0xf0) >> 4);
+        p[6] = ((p2 & 0xf) << 4) | ((p4 & 0xf0) >> 4);
+        p[7] = ((p3 & 0xf) << 4) | ((p2 & 0xf0) >> 4);
+
+        p += 8;
+      }
+    }
+
+  } else if (y_size >= 2) {
+    // To invert a two-pixel high image, we just flip two rows within a cell.
+    unsigned char *p = image.p();
+    in.read((char *)p, row_length);
+
+    for (int ci = 0; ci < num_cols; ++ci) {
+      unsigned char p2 = p[2];
+      unsigned char p3 = p[3];
+      unsigned char p4 = p[4];
+
+      p[2] = ((p4 & 0xf) << 4) | ((p3 & 0xf0) >> 4);
+      p[3] = ((p2 & 0xf) << 4) | ((p4 & 0xf0) >> 4);
+      p[4] = ((p3 & 0xf) << 4) | ((p2 & 0xf0) >> 4);
+
+      p += 8;
+    }
+
+  } else if (y_size >= 1) {
+    // No need to invert a one-pixel-high image.
+    unsigned char *p = image.p();
+    in.read((char *)p, row_length);
+  }
+
+  return image;
+}
+
+/**
+ * Removes the indicated PreparedGraphicsObjects table from the Texture's
+ * table, without actually releasing the texture.  This is intended to be
+ * called only from PreparedGraphicsObjects::release_texture(); it should
+ * never be called by user code.
+ */
 void Texture::
 clear_prepared(int view, PreparedGraphicsObjects *prepared_objects) {
   PreparedViews::iterator pvi;
@@ -6898,17 +8886,15 @@ clear_prepared(int view, PreparedGraphicsObjects *prepared_objects) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::consider_downgrade
-//       Access: Private, Static
-//  Description: Reduces the number of channels in the texture, if
-//               necessary, according to num_channels.
-////////////////////////////////////////////////////////////////////
+/**
+ * Reduces the number of channels in the texture, if necessary, according to
+ * num_channels.
+ */
 void Texture::
 consider_downgrade(PNMImage &pnmimage, int num_channels, const string &name) {
   if (num_channels != 0 && num_channels < pnmimage.get_num_channels()) {
-    // One special case: we can't reduce from 3 to 2 components, since
-    // that would require adding an alpha channel.
+    // One special case: we can't reduce from 3 to 2 components, since that
+    // would require adding an alpha channel.
     if (pnmimage.get_num_channels() == 3 && num_channels == 2) {
       return;
     }
@@ -6921,13 +8907,11 @@ consider_downgrade(PNMImage &pnmimage, int num_channels, const string &name) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::compare_images
-//       Access: Private, Static
-//  Description: Called by generate_simple_ram_image(), this compares
-//               the two PNMImages pixel-by-pixel.  If they're similar
-//               enough (within a given threshold), returns true.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by generate_simple_ram_image(), this compares the two PNMImages
+ * pixel-by-pixel.  If they're similar enough (within a given threshold),
+ * returns true.
+ */
 bool Texture::
 compare_images(const PNMImage &a, const PNMImage &b) {
   nassertr(a.get_maxval() == 255 && b.get_maxval() == 255, false);
@@ -6937,11 +8921,15 @@ compare_images(const PNMImage &a, const PNMImage &b) {
 
   int delta = 0;
   for (int yi = 0; yi < a.get_y_size(); ++yi) {
+    xel *a_row = a.row(yi);
+    xel *b_row = b.row(yi);
+    xelval *a_alpha_row = a.alpha_row(yi);
+    xelval *b_alpha_row = b.alpha_row(yi);
     for (int xi = 0; xi < a.get_x_size(); ++xi) {
-      delta += abs(a.get_red_val(xi, yi) - b.get_red_val(xi, yi));
-      delta += abs(a.get_green_val(xi, yi) - b.get_green_val(xi, yi));
-      delta += abs(a.get_blue_val(xi, yi) - b.get_blue_val(xi, yi));
-      delta += abs(a.get_alpha_val(xi, yi) - b.get_alpha_val(xi, yi));
+      delta += abs(PPM_GETR(a_row[xi]) - PPM_GETR(b_row[xi]));
+      delta += abs(PPM_GETG(a_row[xi]) - PPM_GETG(b_row[xi]));
+      delta += abs(PPM_GETB(a_row[xi]) - PPM_GETB(b_row[xi]));
+      delta += abs(a_alpha_row[xi] - b_alpha_row[xi]);
     }
   }
 
@@ -6949,19 +8937,15 @@ compare_images(const PNMImage &a, const PNMImage &b) {
   return (average_delta <= simple_image_threshold);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_filter_2d_mipmap_pages
-//       Access: Private
-//  Description: Generates the next mipmap level from the previous
-//               one.  If there are multiple pages (e.g. a cube map),
-//               generates each page independently.
-//
-//               x_size and y_size are the size of the previous level.
-//               They need not be a power of 2, or even a multiple of
-//               2.
-//
-//               Assumes the lock is already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * Generates the next mipmap level from the previous one.  If there are
+ * multiple pages (e.g.  a cube map), generates each page independently.
+ *
+ * x_size and y_size are the size of the previous level.  They need not be a
+ * power of 2, or even a multiple of 2.
+ *
+ * Assumes the lock is already held.
+ */
 void Texture::
 do_filter_2d_mipmap_pages(const CData *cdata,
                           Texture::RamImage &to, const Texture::RamImage &from,
@@ -6970,8 +8954,8 @@ do_filter_2d_mipmap_pages(const CData *cdata,
   Filter2DComponent *filter_alpha;
 
   if (is_srgb(cdata->_format)) {
-    // We currently only support sRGB mipmap generation for
-    // unsigned byte textures, due to our use of a lookup table.
+    // We currently only support sRGB mipmap generation for unsigned byte
+    // textures, due to our use of a lookup table.
     nassertv(cdata->_component_type == T_unsigned_byte);
 
     if (has_sse2_sRGB_encode()) {
@@ -7105,19 +9089,15 @@ do_filter_2d_mipmap_pages(const CData *cdata,
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_filter_3d_mipmap_level
-//       Access: Private
-//  Description: Generates the next mipmap level from the previous
-//               one, treating all the pages of the level as a single
-//               3-d block of pixels.
-//
-//               x_size, y_size, and z_size are the size of the
-//               previous level.  They need not be a power of 2, or
-//               even a multiple of 2.
-//
-//               Assumes the lock is already held.
-////////////////////////////////////////////////////////////////////
+/**
+ * Generates the next mipmap level from the previous one, treating all the
+ * pages of the level as a single 3-d block of pixels.
+ *
+ * x_size, y_size, and z_size are the size of the previous level.  They need
+ * not be a power of 2, or even a multiple of 2.
+ *
+ * Assumes the lock is already held.
+ */
 void Texture::
 do_filter_3d_mipmap_level(const CData *cdata,
                           Texture::RamImage &to, const Texture::RamImage &from,
@@ -7126,8 +9106,8 @@ do_filter_3d_mipmap_level(const CData *cdata,
   Filter3DComponent *filter_alpha;
 
   if (is_srgb(cdata->_format)) {
-    // We currently only support sRGB mipmap generation for
-    // unsigned byte textures, due to our use of a lookup table.
+    // We currently only support sRGB mipmap generation for unsigned byte
+    // textures, due to our use of a lookup table.
     nassertv(cdata->_component_type == T_unsigned_byte);
 
     if (has_sse2_sRGB_encode()) {
@@ -7351,13 +9331,10 @@ do_filter_3d_mipmap_level(const CData *cdata,
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_2d_unsigned_byte
-//       Access: Public, Static
-//  Description: Averages a 2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2 block of pixel components into a single pixel component, for
+ * producing the next mipmap level.  Increments p and q to the next component.
+ */
 void Texture::
 filter_2d_unsigned_byte(unsigned char *&p, const unsigned char *&q,
                         size_t pixel_size, size_t row_size) {
@@ -7370,13 +9347,10 @@ filter_2d_unsigned_byte(unsigned char *&p, const unsigned char *&q,
   ++q;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_2d_unsigned_byte_srgb
-//       Access: Public, Static
-//  Description: Averages a 2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2 block of pixel components into a single pixel component, for
+ * producing the next mipmap level.  Increments p and q to the next component.
+ */
 void Texture::
 filter_2d_unsigned_byte_srgb(unsigned char *&p, const unsigned char *&q,
                              size_t pixel_size, size_t row_size) {
@@ -7390,13 +9364,10 @@ filter_2d_unsigned_byte_srgb(unsigned char *&p, const unsigned char *&q,
   ++q;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_2d_unsigned_byte_srgb_sse2
-//       Access: Public, Static
-//  Description: Averages a 2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2 block of pixel components into a single pixel component, for
+ * producing the next mipmap level.  Increments p and q to the next component.
+ */
 void Texture::
 filter_2d_unsigned_byte_srgb_sse2(unsigned char *&p, const unsigned char *&q,
                                   size_t pixel_size, size_t row_size) {
@@ -7410,13 +9381,10 @@ filter_2d_unsigned_byte_srgb_sse2(unsigned char *&p, const unsigned char *&q,
   ++q;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_2d_unsigned_short
-//       Access: Public, Static
-//  Description: Averages a 2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2 block of pixel components into a single pixel component, for
+ * producing the next mipmap level.  Increments p and q to the next component.
+ */
 void Texture::
 filter_2d_unsigned_short(unsigned char *&p, const unsigned char *&q,
                          size_t pixel_size, size_t row_size) {
@@ -7428,13 +9396,10 @@ filter_2d_unsigned_short(unsigned char *&p, const unsigned char *&q,
   q += 2;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_2d_float
-//       Access: Public, Static
-//  Description: Averages a 2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2 block of pixel components into a single pixel component, for
+ * producing the next mipmap level.  Increments p and q to the next component.
+ */
 void Texture::
 filter_2d_float(unsigned char *&p, const unsigned char *&q,
                 size_t pixel_size, size_t row_size) {
@@ -7446,13 +9411,11 @@ filter_2d_float(unsigned char *&p, const unsigned char *&q,
   q += 4;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_3d_unsigned_byte
-//       Access: Public, Static
-//  Description: Averages a 2x2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2x2 block of pixel components into a single pixel component,
+ * for producing the next mipmap level.  Increments p and q to the next
+ * component.
+ */
 void Texture::
 filter_3d_unsigned_byte(unsigned char *&p, const unsigned char *&q,
                         size_t pixel_size, size_t row_size, size_t page_size) {
@@ -7469,13 +9432,11 @@ filter_3d_unsigned_byte(unsigned char *&p, const unsigned char *&q,
   ++q;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_3d_unsigned_byte_srgb
-//       Access: Public, Static
-//  Description: Averages a 2x2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2x2 block of pixel components into a single pixel component,
+ * for producing the next mipmap level.  Increments p and q to the next
+ * component.
+ */
 void Texture::
 filter_3d_unsigned_byte_srgb(unsigned char *&p, const unsigned char *&q,
                              size_t pixel_size, size_t row_size, size_t page_size) {
@@ -7493,13 +9454,11 @@ filter_3d_unsigned_byte_srgb(unsigned char *&p, const unsigned char *&q,
   ++q;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_3d_unsigned_byte_srgb_sse2
-//       Access: Public, Static
-//  Description: Averages a 2x2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2x2 block of pixel components into a single pixel component,
+ * for producing the next mipmap level.  Increments p and q to the next
+ * component.
+ */
 void Texture::
 filter_3d_unsigned_byte_srgb_sse2(unsigned char *&p, const unsigned char *&q,
                                   size_t pixel_size, size_t row_size, size_t page_size) {
@@ -7517,13 +9476,11 @@ filter_3d_unsigned_byte_srgb_sse2(unsigned char *&p, const unsigned char *&q,
   ++q;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_3d_unsigned_short
-//       Access: Public, Static
-//  Description: Averages a 2x2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2x2 block of pixel components into a single pixel component,
+ * for producing the next mipmap level.  Increments p and q to the next
+ * component.
+ */
 void Texture::
 filter_3d_unsigned_short(unsigned char *&p, const unsigned char *&q,
                          size_t pixel_size, size_t row_size,
@@ -7540,13 +9497,11 @@ filter_3d_unsigned_short(unsigned char *&p, const unsigned char *&q,
   q += 2;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::filter_3d_float
-//       Access: Public, Static
-//  Description: Averages a 2x2x2 block of pixel components into a
-//               single pixel component, for producing the next mipmap
-//               level.  Increments p and q to the next component.
-////////////////////////////////////////////////////////////////////
+/**
+ * Averages a 2x2x2 block of pixel components into a single pixel component,
+ * for producing the next mipmap level.  Increments p and q to the next
+ * component.
+ */
 void Texture::
 filter_3d_float(unsigned char *&p, const unsigned char *&q,
                 size_t pixel_size, size_t row_size, size_t page_size) {
@@ -7562,23 +9517,16 @@ filter_3d_float(unsigned char *&p, const unsigned char *&q,
   q += 4;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_squish
-//       Access: Private
-//  Description: Invokes the squish library to compress the RAM
-//               image(s).
-////////////////////////////////////////////////////////////////////
+/**
+ * Invokes the squish library to compress the RAM image(s).
+ */
 bool Texture::
 do_squish(CData *cdata, Texture::CompressionMode compression, int squish_flags) {
 #ifdef HAVE_SQUISH
-  if (cdata->_ram_images.empty() || cdata->_ram_image_compression != CM_off) {
-    return false;
-  }
-
   if (!do_has_all_ram_mipmap_images(cdata)) {
-    // If we're about to compress the RAM image, we should ensure that
-    // we have all of the mipmap levels first.
-    do_generate_ram_mipmap_images(cdata);
+    // If we're about to compress the RAM image, we should ensure that we have
+    // all of the mipmap levels first.
+    do_generate_ram_mipmap_images(cdata, false);
   }
 
   RamImages compressed_ram_images;
@@ -7660,18 +9608,12 @@ do_squish(CData *cdata, Texture::CompressionMode compression, int squish_flags) 
 #endif  // HAVE_SQUISH
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_unsquish
-//       Access: Private
-//  Description: Invokes the squish library to uncompress the RAM
-//               image(s).
-////////////////////////////////////////////////////////////////////
+/**
+ * Invokes the squish library to uncompress the RAM image(s).
+ */
 bool Texture::
 do_unsquish(CData *cdata, int squish_flags) {
 #ifdef HAVE_SQUISH
-  if (cdata->_ram_images.empty()) {
-    return false;
-  }
   RamImages uncompressed_ram_images;
   uncompressed_ram_images.reserve(cdata->_ram_images.size());
   for (size_t n = 0; n < cdata->_ram_images.size(); ++n) {
@@ -7744,22 +9686,18 @@ do_unsquish(CData *cdata, int squish_flags) {
 #endif  // HAVE_SQUISH
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::register_with_read_factory
-//       Access: Public, Static
-//  Description: Factory method to generate a Texture object
-////////////////////////////////////////////////////////////////////
+/**
+ * Factory method to generate a Texture object
+ */
 void Texture::
 register_with_read_factory() {
   BamReader::get_factory()->register_factory(get_class_type(), make_from_bam);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::write_datagram
-//       Access: Public, Virtual
-//  Description: Function to write the important information in
-//               the particular object to a Datagram
-////////////////////////////////////////////////////////////////////
+/**
+ * Function to write the important information in the particular object to a
+ * Datagram
+ */
 void Texture::
 write_datagram(BamWriter *manager, Datagram &me) {
   CDWriter cdata(_cycler, false);
@@ -7768,64 +9706,54 @@ write_datagram(BamWriter *manager, Datagram &me) {
   do_write_datagram_header(cdata, manager, me, has_rawdata);
   do_write_datagram_body(cdata, manager, me);
 
-  // If we are also including the texture's image data, then stuff it
-  // in here.
+  // If we are also including the texture's image data, then stuff it in here.
   if (has_rawdata) {
     do_write_datagram_rawdata(cdata, manager, me);
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::finalize
-//       Access: Public, Virtual
-//  Description: Called by the BamReader to perform any final actions
-//               needed for setting up the object after all objects
-//               have been read and all pointers have been completed.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by the BamReader to perform any final actions needed for setting up
+ * the object after all objects have been read and all pointers have been
+ * completed.
+ */
 void Texture::
 finalize(BamReader *) {
   // Unref the pointer that we explicitly reffed in make_from_bam().
   unref();
 
-  // We should never get back to zero after unreffing our own count,
-  // because we expect to have been stored in a pointer somewhere.  If
-  // we do get to zero, it's a memory leak; the way to avoid this is
-  // to call unref_delete() above instead of unref(), but this is
-  // dangerous to do from within a virtual function.
+  // We should never get back to zero after unreffing our own count, because
+  // we expect to have been stored in a pointer somewhere.  If we do get to
+  // zero, it's a memory leak; the way to avoid this is to call unref_delete()
+  // above instead of unref(), but this is dangerous to do from within a
+  // virtual function.
   nassertv(get_ref_count() != 0);
 }
 
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_write_datagram_header
-//       Access: Protected
-//  Description: Writes the header part of the texture to the
-//               Datagram.  This is the common part that is shared by
-//               all Texture subclasses, and contains the filename and
-//               rawdata flags.  This method is not virtual because
-//               all Texture subclasses must write the same data at
-//               this step.
-//
-//               This part must be read first before calling
-//               do_fillin_body() to determine whether to load the
-//               Texture from the TexturePool or directly from the bam
-//               stream.
-//
-//               After this call, has_rawdata will be filled with
-//               either true or false, according to whether we expect
-//               to write the texture rawdata to the bam stream
-//               following the texture body.
-////////////////////////////////////////////////////////////////////
+/**
+ * Writes the header part of the texture to the Datagram.  This is the common
+ * part that is shared by all Texture subclasses, and contains the filename
+ * and rawdata flags.  This method is not virtual because all Texture
+ * subclasses must write the same data at this step.
+ *
+ * This part must be read first before calling do_fillin_body() to determine
+ * whether to load the Texture from the TexturePool or directly from the bam
+ * stream.
+ *
+ * After this call, has_rawdata will be filled with either true or false,
+ * according to whether we expect to write the texture rawdata to the bam
+ * stream following the texture body.
+ */
 void Texture::
 do_write_datagram_header(CData *cdata, BamWriter *manager, Datagram &me, bool &has_rawdata) {
-  // Write out the texture's raw pixel data if (a) the current Bam
-  // Texture Mode requires that, or (b) there's no filename, so the
-  // file can't be loaded up from disk, but the raw pixel data is
-  // currently available in RAM.
+  // Write out the texture's raw pixel data if (a) the current Bam Texture
+  // Mode requires that, or (b) there's no filename, so the file can't be
+  // loaded up from disk, but the raw pixel data is currently available in
+  // RAM.
 
-  // Otherwise, we just write out the filename, and assume whoever
-  // loads the bam file later will have access to the image file on
-  // disk.
+  // Otherwise, we just write out the filename, and assume whoever loads the
+  // bam file later will have access to the image file on disk.
   BamWriter::BamTextureMode file_texture_mode = manager->get_file_texture_mode();
   has_rawdata = (file_texture_mode == BamWriter::BTM_rawdata ||
                  (cdata->_filename.empty() && do_has_bam_rawdata(cdata)));
@@ -7897,20 +9825,39 @@ do_write_datagram_header(CData *cdata, BamWriter *manager, Datagram &me, bool &h
   me.add_uint8(cdata->_primary_file_num_channels);
   me.add_uint8(cdata->_alpha_file_channel);
   me.add_bool(has_rawdata);
-  me.add_uint8(cdata->_texture_type);
-  me.add_bool(cdata->_has_read_mipmaps);
+
+  if (manager->get_file_minor_ver() < 25 &&
+      cdata->_texture_type == TT_cube_map) {
+    // Between Panda3D releases 1.7.2 and 1.8.0 (bam versions 6.24 and 6.25),
+    // we added TT_2d_texture_array, shifting the definition for TT_cube_map.
+    me.add_uint8(TT_2d_texture_array);
+  } else {
+    me.add_uint8(cdata->_texture_type);
+  }
+
+  if (manager->get_file_minor_ver() >= 32) {
+    me.add_bool(cdata->_has_read_mipmaps);
+  }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_write_datagram_body
-//       Access: Protected, Virtual
-//  Description: Writes the body part of the texture to the
-//               Datagram.  This is generally all of the texture
-//               parameters except for the header and the rawdata.
-////////////////////////////////////////////////////////////////////
+/**
+ * Writes the body part of the texture to the Datagram.  This is generally all
+ * of the texture parameters except for the header and the rawdata.
+ */
 void Texture::
 do_write_datagram_body(CData *cdata, BamWriter *manager, Datagram &me) {
-  cdata->_default_sampler.write_datagram(me);
+  if (manager->get_file_minor_ver() >= 36) {
+    cdata->_default_sampler.write_datagram(me);
+  } else {
+    const SamplerState &s = cdata->_default_sampler;
+    me.add_uint8(s.get_wrap_u());
+    me.add_uint8(s.get_wrap_v());
+    me.add_uint8(s.get_wrap_w());
+    me.add_uint8(s.get_minfilter());
+    me.add_uint8(s.get_magfilter());
+    me.add_int16(s.get_anisotropic_degree());
+    s.get_border_color().write_datagram(me);
+  }
 
   me.add_uint8(cdata->_compression);
   me.add_uint8(cdata->_quality_level);
@@ -7922,7 +9869,9 @@ do_write_datagram_body(CData *cdata, BamWriter *manager, Datagram &me) {
     me.add_uint8(cdata->_usage_hint);
   }
 
-  me.add_uint8(cdata->_auto_texture_scale);
+  if (manager->get_file_minor_ver() >= 28) {
+    me.add_uint8(cdata->_auto_texture_scale);
+  }
   me.add_uint32(cdata->_orig_file_x_size);
   me.add_uint32(cdata->_orig_file_y_size);
 
@@ -7939,23 +9888,24 @@ do_write_datagram_body(CData *cdata, BamWriter *manager, Datagram &me) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_write_datagram_rawdata
-//       Access: Protected, Virtual
-//  Description: Writes the rawdata part of the texture to the
-//               Datagram.
-////////////////////////////////////////////////////////////////////
+/**
+ * Writes the rawdata part of the texture to the Datagram.
+ */
 void Texture::
 do_write_datagram_rawdata(CData *cdata, BamWriter *manager, Datagram &me) {
   me.add_uint32(cdata->_x_size);
   me.add_uint32(cdata->_y_size);
   me.add_uint32(cdata->_z_size);
 
-  me.add_uint32(cdata->_pad_x_size);
-  me.add_uint32(cdata->_pad_y_size);
-  me.add_uint32(cdata->_pad_z_size);
+  if (manager->get_file_minor_ver() >= 30) {
+    me.add_uint32(cdata->_pad_x_size);
+    me.add_uint32(cdata->_pad_y_size);
+    me.add_uint32(cdata->_pad_z_size);
+  }
 
-  me.add_uint32(cdata->_num_views);
+  if (manager->get_file_minor_ver() >= 26) {
+    me.add_uint32(cdata->_num_views);
+  }
   me.add_uint8(cdata->_component_type);
   me.add_uint8(cdata->_component_width);
   me.add_uint8(cdata->_ram_image_compression);
@@ -7967,42 +9917,35 @@ do_write_datagram_rawdata(CData *cdata, BamWriter *manager, Datagram &me) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::make_from_bam
-//       Access: Protected, Static
-//  Description: Factory method to generate a Texture object
-////////////////////////////////////////////////////////////////////
+/**
+ * Factory method to generate a Texture object
+ */
 TypedWritable *Texture::
 make_from_bam(const FactoryParams &params) {
   PT(Texture) dummy = new Texture;
   return dummy->make_this_from_bam(params);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::make_this_from_bam
-//       Access: Protected, Virtual
-//  Description: Called by make_from_bam() once the particular
-//               subclass of Texture is known.  This is called on a
-//               newly-constructed Texture object of the appropriate
-//               subclass.  It will return either the same Texture
-//               object (e.g. this), or a different Texture object
-//               loaded via the TexturePool, as appropriate.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called by make_from_bam() once the particular subclass of Texture is known.
+ * This is called on a newly-constructed Texture object of the appropriate
+ * subclass.  It will return either the same Texture object (e.g.  this), or a
+ * different Texture object loaded via the TexturePool, as appropriate.
+ */
 TypedWritable *Texture::
 make_this_from_bam(const FactoryParams &params) {
-  // The process of making a texture is slightly different than making
-  // other TypedWritable objects.  That is because all creation of
-  // Textures should be done through calls to TexturePool, which
-  // ensures that any loads of the same filename refer to the same
-  // memory.
+  // The process of making a texture is slightly different than making other
+  // TypedWritable objects.  That is because all creation of Textures should
+  // be done through calls to TexturePool, which ensures that any loads of the
+  // same filename refer to the same memory.
 
   DatagramIterator scan;
   BamReader *manager;
 
   parse_params(params, scan, manager);
 
-  // Get the header information--the filenames and texture type--so we
-  // can look up the file on disk first.
+  // Get the header information--the filenames and texture type--so we can
+  // look up the file on disk first.
   string name = scan.get_string();
   Filename filename = scan.get_string();
   Filename alpha_filename = scan.get_string();
@@ -8012,9 +9955,8 @@ make_this_from_bam(const FactoryParams &params) {
   bool has_rawdata = scan.get_bool();
   TextureType texture_type = (TextureType)scan.get_uint8();
   if (manager->get_file_minor_ver() < 25) {
-    // Between Panda3D releases 1.7.2 and 1.8.0 (bam versions 6.24 and
-    // 6.25), we added TT_2d_texture_array, shifting the definition
-    // for TT_cube_map.
+    // Between Panda3D releases 1.7.2 and 1.8.0 (bam versions 6.24 and 6.25),
+    // we added TT_2d_texture_array, shifting the definition for TT_cube_map.
     if (texture_type == TT_2d_texture_array) {
       texture_type = TT_cube_map;
     }
@@ -8026,10 +9968,10 @@ make_this_from_bam(const FactoryParams &params) {
 
   Texture *me = NULL;
   if (has_rawdata) {
-    // If the raw image data is included, then just load the texture
-    // directly from the stream, and return it.  In this case we
-    // return the "this" pointer, since it's a newly-created Texture
-    // object of the appropriate type.
+    // If the raw image data is included, then just load the texture directly
+    // from the stream, and return it.  In this case we return the "this"
+    // pointer, since it's a newly-created Texture object of the appropriate
+    // type.
     me = this;
     me->set_name(name);
     CDWriter cdata_me(me->_cycler, true);
@@ -8044,16 +9986,15 @@ make_this_from_bam(const FactoryParams &params) {
     me->do_fillin_body(cdata_me, scan, manager);
     me->do_fillin_rawdata(cdata_me, scan, manager);
 
-    // To manage the reference count, explicitly ref it now, then
-    // unref it in the finalize callback.
+    // To manage the reference count, explicitly ref it now, then unref it in
+    // the finalize callback.
     me->ref();
     manager->register_finalize(me);
 
   } else {
-    // The raw image data isn't included, so we'll be loading the
-    // Texture via the TexturePool.  In this case we use the "this"
-    // pointer as a temporary object to read all of the attributes
-    // from the bam stream.
+    // The raw image data isn't included, so we'll be loading the Texture via
+    // the TexturePool.  In this case we use the "this" pointer as a temporary
+    // object to read all of the attributes from the bam stream.
     Texture *dummy = this;
     AutoTextureScale auto_texture_scale = ATS_unspecified;
     {
@@ -8063,8 +10004,8 @@ make_this_from_bam(const FactoryParams &params) {
     }
 
     if (filename.empty()) {
-      // This texture has no filename; since we don't have an image to
-      // load, we can't actually create the texture.
+      // This texture has no filename; since we don't have an image to load,
+      // we can't actually create the texture.
       gobj_cat.info()
         << "Cannot create texture '" << name << "' with no filename.\n";
 
@@ -8072,8 +10013,8 @@ make_this_from_bam(const FactoryParams &params) {
       // This texture does have a filename, so try to load it from disk.
       VirtualFileSystem *vfs = VirtualFileSystem::get_global_ptr();
       if (!manager->get_filename().empty()) {
-        // If texture filename was given relative to the bam filename,
-        // expand it now.
+        // If texture filename was given relative to the bam filename, expand
+        // it now.
         Filename bam_dir = manager->get_filename().get_dirname();
         vfs->resolve_filename(filename, bam_dir);
         if (!alpha_filename.empty()) {
@@ -8107,6 +10048,7 @@ make_this_from_bam(const FactoryParams &params) {
         break;
 
       case TT_2d_texture_array:
+      case TT_cube_map_array:
         me = TexturePool::load_2d_texture_array(filename, has_read_mipmaps, options);
         break;
 
@@ -8121,21 +10063,19 @@ make_this_from_bam(const FactoryParams &params) {
       CDWriter cdata_me(me->_cycler, true);
       me->do_fillin_from(cdata_me, dummy);
 
-      // Since in this case me was loaded from the TexturePool,
-      // there's no need to explicitly manage the reference count.
-      // TexturePool will hold it safely.
+      // Since in this case me was loaded from the TexturePool, there's no
+      // need to explicitly manage the reference count.  TexturePool will hold
+      // it safely.
     }
   }
 
   return me;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_fillin_body
-//       Access: Protected, Virtual
-//  Description: Reads in the part of the Texture that was written
-//               with do_write_datagram_body().
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads in the part of the Texture that was written with
+ * do_write_datagram_body().
+ */
 void Texture::
 do_fillin_body(CData *cdata, DatagramIterator &scan, BamReader *manager) {
   cdata->_default_sampler.read_datagram(scan, manager);
@@ -8184,12 +10124,10 @@ do_fillin_body(CData *cdata, DatagramIterator &scan, BamReader *manager) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_fillin_rawdata
-//       Access: Protected, Virtual
-//  Description: Reads in the part of the Texture that was written
-//               with do_write_datagram_rawdata().
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads in the part of the Texture that was written with
+ * do_write_datagram_rawdata().
+ */
 void Texture::
 do_fillin_rawdata(CData *cdata, DatagramIterator &scan, BamReader *manager) {
   cdata->_x_size = scan.get_uint32();
@@ -8240,22 +10178,18 @@ do_fillin_rawdata(CData *cdata, DatagramIterator &scan, BamReader *manager) {
   cdata->inc_image_modified();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::do_fillin_from
-//       Access: Protected, Virtual
-//  Description: Called in make_from_bam(), this method properly
-//               copies the attributes from the bam stream (as stored
-//               in dummy) into this texture, updating the modified
-//               flags appropriately.
-////////////////////////////////////////////////////////////////////
+/**
+ * Called in make_from_bam(), this method properly copies the attributes from
+ * the bam stream (as stored in dummy) into this texture, updating the
+ * modified flags appropriately.
+ */
 void Texture::
 do_fillin_from(CData *cdata, const Texture *dummy) {
-  // Use the setters instead of setting these directly, so we can
-  // correctly avoid incrementing cdata->_properties_modified if none of
-  // these actually change.  (Otherwise, we'd have to reload the
-  // texture to the GSG every time we loaded a new bam file that
-  // reference the texture, since each bam file reference passes
-  // through this function.)
+  // Use the setters instead of setting these directly, so we can correctly
+  // avoid incrementing cdata->_properties_modified if none of these actually
+  // change.  (Otherwise, we'd have to reload the texture to the GSG every
+  // time we loaded a new bam file that reference the texture, since each bam
+  // file reference passes through this function.)
 
   CDReader cdata_dummy(dummy->_cycler);
 
@@ -8284,16 +10218,15 @@ do_fillin_from(CData *cdata, const Texture *dummy) {
   int num_components = cdata_dummy->_num_components;
 
   if (num_components == cdata->_num_components) {
-    // Only reset the format if the number of components hasn't
-    // changed, since if the number of components has changed our
-    // texture no longer matches what it was when the bam was
-    // written.
+    // Only reset the format if the number of components hasn't changed, since
+    // if the number of components has changed our texture no longer matches
+    // what it was when the bam was written.
     do_set_format(cdata, format);
   }
 
   if (!cdata_dummy->_simple_ram_image._image.empty()) {
-    // Only replace the simple ram image if it was generated more
-    // recently than the one we already have.
+    // Only replace the simple ram image if it was generated more recently
+    // than the one we already have.
     if (cdata->_simple_ram_image._image.empty() ||
         cdata_dummy->_simple_image_date_generated > cdata->_simple_image_date_generated) {
       do_set_simple_ram_image(cdata,
@@ -8305,11 +10238,9 @@ do_fillin_from(CData *cdata, const Texture *dummy) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::CData::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 Texture::CData::
 CData() {
   _primary_file_num_channels = 0;
@@ -8329,9 +10260,9 @@ CData() {
   _z_size = 1;
   _num_views = 1;
 
-  // We will override the format in a moment (in the Texture
-  // constructor), but set it to something else first to avoid the
-  // check in do_set_format depending on an uninitialized value.
+  // We will override the format in a moment (in the Texture constructor), but
+  // set it to something else first to avoid the check in do_set_format
+  // depending on an uninitialized value.
   _format = F_rgba;
 
   // Only used for buffer textures.
@@ -8357,11 +10288,9 @@ CData() {
   _has_clear_color = false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::CData::Copy Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 Texture::CData::
 CData(const Texture::CData &copy) {
   _num_mipmap_levels_read = 0;
@@ -8373,28 +10302,24 @@ CData(const Texture::CData &copy) {
   _simple_image_modified = copy._simple_image_modified;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::CData::make_copy
-//       Access: Public, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CycleData *Texture::CData::
 make_copy() const {
   return new CData(*this);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::CData::do_assign
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Texture::CData::
 do_assign(const Texture::CData *copy) {
   _filename = copy->_filename;
   _alpha_filename = copy->_alpha_filename;
   if (!copy->_fullpath.empty()) {
-    // Since the fullpath is often empty on a file loaded directly
-    // from a txo, we only assign the fullpath if it is not empty.
+    // Since the fullpath is often empty on a file loaded directly from a txo,
+    // we only assign the fullpath if it is not empty.
     _fullpath = copy->_fullpath;
     _alpha_fullpath = copy->_alpha_fullpath;
   }
@@ -8432,88 +10357,74 @@ do_assign(const Texture::CData *copy) {
   _simple_ram_image = copy->_simple_ram_image;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::CData::write_datagram
-//       Access: Public, Virtual
-//  Description: Writes the contents of this object to the datagram
-//               for shipping out to a Bam file.
-////////////////////////////////////////////////////////////////////
+/**
+ * Writes the contents of this object to the datagram for shipping out to a
+ * Bam file.
+ */
 void Texture::CData::
 write_datagram(BamWriter *manager, Datagram &dg) const {
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::CData::complete_pointers
-//       Access: Public, Virtual
-//  Description: Receives an array of pointers, one for each time
-//               manager->read_pointer() was called in fillin().
-//               Returns the number of pointers processed.
-////////////////////////////////////////////////////////////////////
+/**
+ * Receives an array of pointers, one for each time manager->read_pointer()
+ * was called in fillin(). Returns the number of pointers processed.
+ */
 int Texture::CData::
 complete_pointers(TypedWritable **p_list, BamReader *manager) {
   return 0;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::CData::fillin
-//       Access: Public, Virtual
-//  Description: This internal function is called by make_from_bam to
-//               read in all of the relevant data from the BamFile for
-//               the new Geom.
-////////////////////////////////////////////////////////////////////
+/**
+ * This internal function is called by make_from_bam to read in all of the
+ * relevant data from the BamFile for the new Geom.
+ */
 void Texture::CData::
 fillin(DatagramIterator &scan, BamReader *manager) {
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::TextureType output operator
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 ostream &
 operator << (ostream &out, Texture::TextureType tt) {
   return out << Texture::format_texture_type(tt);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::ComponentType output operator
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 ostream &
 operator << (ostream &out, Texture::ComponentType ct) {
   return out << Texture::format_component_type(ct);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::Format output operator
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 ostream &
 operator << (ostream &out, Texture::Format f) {
   return out << Texture::format_format(f);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::CompressionMode output operator
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 ostream &
 operator << (ostream &out, Texture::CompressionMode cm) {
   return out << Texture::format_compression_mode(cm);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::QualityLevel output operator
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 ostream &
 operator << (ostream &out, Texture::QualityLevel tql) {
   return out << Texture::format_quality_level(tql);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Texture::QualityLevel input operator
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 istream &
 operator >> (istream &in, Texture::QualityLevel &tql) {
   string word;

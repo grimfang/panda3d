@@ -1,8 +1,4 @@
-/* Filename: interrogate_request.h
- * Created by:  drose (01Aug00)
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- *
+/**
  * PANDA 3D SOFTWARE
  * Copyright (c) Carnegie Mellon University.  All rights reserved.
  *
@@ -10,7 +6,10 @@
  * license.  You should have received a copy of this license along
  * with this source code in a file named "LICENSE."
  *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+ * @file interrogate_request.h
+ * @author drose
+ * @date 2000-08-01
+ */
 
 #ifndef INTERROGATE_REQUEST
 #define INTERROGATE_REQUEST
@@ -39,7 +38,7 @@ extern "C" {
  * data available, but doesn't allow matching the database information
  * up with any compiled-in function wrappers or anything.
  */
-EXPCL_DTOOLCONFIG void interrogate_request_database(const char *database_filename);
+EXPCL_INTERROGATEDB void interrogate_request_database(const char *database_filename);
 
 
 
@@ -74,11 +73,10 @@ typedef struct {
  * This includes all of the function pointers and/or unique names that
  * might be compiled in.
  */
-EXPCL_DTOOLCONFIG void interrogate_request_module(InterrogateModuleDef *def);
+EXPCL_INTERROGATEDB void interrogate_request_module(InterrogateModuleDef *def);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-

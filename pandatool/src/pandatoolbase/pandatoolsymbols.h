@@ -1,8 +1,4 @@
-/* Filename: pandatoolsymbols.h
- * Created by:  drose (26Apr01)
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- *
+/**
  * PANDA 3D SOFTWARE
  * Copyright (c) Carnegie Mellon University.  All rights reserved.
  *
@@ -10,39 +6,30 @@
  * license.  You should have received a copy of this license along
  * with this source code in a file named "LICENSE."
  *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+ * @file pandatoolsymbols.h
+ * @author drose
+ * @date 2001-04-26
+ */
 
 #ifndef PANDATOOLSYMBOLS_H
 #define PANDATOOLSYMBOLS_H
 
 /* See dtoolsymbols.h for a rant on the purpose of this file.  */
 
-#if defined(WIN32_VC) && !defined(CPPPARSER) && !defined(LINK_ALL_STATIC)
-
 #ifdef BUILDING_ASSIMP
-  #define EXPCL_ASSIMP __declspec(dllexport)
-  #define EXPTP_ASSIMP
+  #define EXPCL_ASSIMP EXPORT_CLASS
+  #define EXPTP_ASSIMP EXPORT_TEMPL
 #else
-  #define EXPCL_ASSIMP __declspec(dllimport)
-  #define EXPTP_ASSIMP extern
+  #define EXPCL_ASSIMP IMPORT_CLASS
+  #define EXPTP_ASSIMP IMPORT_TEMPL
 #endif
 
 #ifdef BUILDING_PTLOADER
-  #define EXPCL_PTLOADER __declspec(dllexport)
-  #define EXPTP_PTLOADER
+  #define EXPCL_PTLOADER EXPORT_CLASS
+  #define EXPTP_PTLOADER EXPORT_TEMPL
 #else
-  #define EXPCL_PTLOADER __declspec(dllimport)
-  #define EXPTP_PTLOADER extern
+  #define EXPCL_PTLOADER IMPORT_CLASS
+  #define EXPTP_PTLOADER IMPORT_TEMPL
 #endif
-
-#else   /* !WIN32_VC */
-
-#define EXPCL_ASSIMP
-#define EXPTP_ASSIMP
-
-#define EXPCL_PTLOADER
-#define EXPTP_PTLOADER
-
-#endif  /* WIN32_VC */
 
 #endif

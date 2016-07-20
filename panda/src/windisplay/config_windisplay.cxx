@@ -1,16 +1,15 @@
-// Filename: config_windisplay.cxx
-// Created by:  drose (20Dec02)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file config_windisplay.cxx
+ * @author drose
+ * @date 2002-12-20
+ */
 
 #include "config_windisplay.h"
 #include "winGraphicsPipe.h"
@@ -65,18 +64,30 @@ ConfigVariableBool request_dxdisplay_information
           "you have a specific need for this information and don't mind "
           "having a slow start-up."));
 
+ConfigVariableBool dpi_aware
+("dpi-aware", true,
+ PRC_DESC("The default behavior is for Panda3D to disable DPI-virtualization "
+          "that is introduced in Windows 8.1.  Set this to false if you are "
+          "experiencing problems with this setting."));
+
+ConfigVariableBool dpi_window_resize
+("dpi-window-resize", false,
+ PRC_DESC("Set this to true to let Panda3D resize the window according to the "
+          "DPI settings whenever the window is dragged to a monitor with "
+          "different DPI, or when the DPI setting is changed in the control "
+          "panel.  Only available in Windows 8.1 and later, and requires "
+          "dpi-aware to be set as well."));
+
 ConfigVariableBool swapbuffer_framelock
 ("swapbuffer-framelock", false,
  PRC_DESC("Set this true to enable HW swapbuffer frame-lock on 3dlabs cards"));
 
-////////////////////////////////////////////////////////////////////
-//     Function: init_libwindisplay
-//  Description: Initializes the library.  This must be called at
-//               least once before any of the functions or classes in
-//               this library can be used.  Normally it will be
-//               called by the static initializers and need not be
-//               called explicitly, but special cases exist.
-////////////////////////////////////////////////////////////////////
+/**
+ * Initializes the library.  This must be called at least once before any of
+ * the functions or classes in this library can be used.  Normally it will be
+ * called by the static initializers and need not be called explicitly, but
+ * special cases exist.
+ */
 void
 init_libwindisplay() {
   static bool initialized = false;

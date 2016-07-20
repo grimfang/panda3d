@@ -1,27 +1,25 @@
-// Filename: panda3dBase.h
-// Created by:  pro-rsoft (07Dec09)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file panda3dBase.h
+ * @author rdb
+ * @date 2009-12-07
+ */
 
 #ifndef PANDA3DBASE_H
 #define PANDA3DBASE_H
 
-// This program must link with Panda for HTTPClient support.  This
-// means it probably should be built with LINK_ALL_STATIC defined, so
-// we won't have to deal with confusing .dll or .so files that might
-// compete on the disk with the dynamically-loaded versions.  There's
-// no competition in memory address space, though, because
-// p3d_plugin--the only file we dynamically link in--doesn't itself
-// link with Panda.
+// This program must link with Panda for HTTPClient support.  This means it
+// probably should be built with LINK_ALL_STATIC defined, so we won't have to
+// deal with confusing .dll or .so files that might compete on the disk with
+// the dynamically-loaded versions.  There's no competition in memory address
+// space, though, because p3d_plugin--the only file we dynamically link in--
+// doesn't itself link with Panda.
 
 #include "pandabase.h"
 #include "p3d_plugin.h"
@@ -31,11 +29,10 @@
 #include "pset.h"
 #include "vector_string.h"
 
-////////////////////////////////////////////////////////////////////
-//       Class : Panda3DBase
-// Description : Base for creating a standalone application that
-//               invokes the panda3d plugin to launch .p3d files.
-////////////////////////////////////////////////////////////////////
+/**
+ * Base for creating a standalone application that invokes the panda3d plugin
+ * to launch .p3d files.
+ */
 class Panda3DBase {
 public:
   Panda3DBase(bool console_environment);
@@ -49,10 +46,10 @@ protected:
 
   P3D_instance *
   create_instance(const string &p3d, bool start_instance,
-                  char **args, int num_args, const int &p3d_offset = 0);
+                  char **args, int num_args, int p3d_offset = 0);
   void delete_instance(P3D_instance *instance);
 
-  bool read_p3d_info(const Filename &p3d_filename);
+  bool read_p3d_info(const Filename &p3d_filename, int p3d_offset = 0);
   bool parse_token(const char *arg);
   bool parse_int_pair(const char *arg, int &x, int &y);
   string lookup_token(const string &keyword) const;
@@ -74,6 +71,7 @@ protected:
   string _host_url;
   string _root_dir;
   string _host_dir;
+  string _start_dir;
   string _log_dirname;
   string _log_basename;
   string _this_platform;
@@ -104,21 +102,21 @@ protected:
   public:
     URLGetter(P3D_instance *instance, int unique_id,
               const URLSpec &url, const string &post_data);
-    
+
     bool run();
     inline P3D_instance *get_instance();
-    
+
   private:
     P3D_instance *_instance;
     int _unique_id;
     URLSpec _url;
     string _post_data;
-    
+
     PT(HTTPChannel) _channel;
     Ramfile _rf;
     size_t _bytes_sent;
   };
-  
+
   typedef pset<URLGetter *> URLGetters;
   URLGetters _url_getters;
 };
@@ -126,4 +124,3 @@ protected:
 #include "panda3dBase.I"
 
 #endif
-

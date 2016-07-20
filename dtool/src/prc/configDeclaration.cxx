@@ -1,16 +1,15 @@
-// Filename: configDeclaration.cxx
-// Created by:  drose (15Oct04)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file configDeclaration.cxx
+ * @author drose
+ * @date 2004-10-15
+ */
 
 #include "configDeclaration.h"
 #include "configVariableCore.h"
@@ -18,12 +17,10 @@
 #include "pstrtod.h"
 #include "string_utils.h"
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::Constructor
-//       Access: Private
-//  Description: Use the ConfigPage::make_declaration() interface to
-//               create a new declaration.
-////////////////////////////////////////////////////////////////////
+/**
+ * Use the ConfigPage::make_declaration() interface to create a new
+ * declaration.
+ */
 ConfigDeclaration::
 ConfigDeclaration(ConfigPage *page, ConfigVariableCore *variable,
                   const string &string_value, int decl_seq) :
@@ -38,12 +35,9 @@ ConfigDeclaration(ConfigPage *page, ConfigVariableCore *variable,
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::Destructor
-//       Access: Private
-//  Description: Use the ConfigPage::delete_declaration() interface to
-//               delete a declaration.
-////////////////////////////////////////////////////////////////////
+/**
+ * Use the ConfigPage::delete_declaration() interface to delete a declaration.
+ */
 ConfigDeclaration::
 ~ConfigDeclaration() {
   if (!_page->is_special()) {
@@ -51,19 +45,17 @@ ConfigDeclaration::
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::set_string_word
-//       Access: Public
-//  Description: Changes the nth word to the indicated value without
-//               affecting the other words.
-////////////////////////////////////////////////////////////////////
+/**
+ * Changes the nth word to the indicated value without affecting the other
+ * words.
+ */
 void ConfigDeclaration::
-set_string_word(int n, const string &value) {
+set_string_word(size_t n, const string &value) {
   if (!_got_words) {
     get_words();
   }
 
-  while (n >= (int)_words.size()) {
+  while (n >= _words.size()) {
     Word w;
     w._flags = 0;
     _words.push_back(w);
@@ -85,14 +77,12 @@ set_string_word(int n, const string &value) {
   invalidate_cache();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::set_bool_word
-//       Access: Public
-//  Description: Changes the nth word to the indicated value without
-//               affecting the other words.
-////////////////////////////////////////////////////////////////////
+/**
+ * Changes the nth word to the indicated value without affecting the other
+ * words.
+ */
 void ConfigDeclaration::
-set_bool_word(int n, bool value) {
+set_bool_word(size_t n, bool value) {
   set_string_word(n, value ? "1" : "0");
 
   _words[n]._flags |= (F_checked_bool | F_valid_bool);
@@ -100,14 +90,12 @@ set_bool_word(int n, bool value) {
   invalidate_cache();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::set_int_word
-//       Access: Public
-//  Description: Changes the nth word to the indicated value without
-//               affecting the other words.
-////////////////////////////////////////////////////////////////////
+/**
+ * Changes the nth word to the indicated value without affecting the other
+ * words.
+ */
 void ConfigDeclaration::
-set_int_word(int n, int value) {
+set_int_word(size_t n, int value) {
   set_string_word(n, format_string(value));
 
   _words[n]._flags |= (F_checked_int | F_valid_int);
@@ -115,14 +103,12 @@ set_int_word(int n, int value) {
   invalidate_cache();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::set_int64_word
-//       Access: Public
-//  Description: Changes the nth word to the indicated value without
-//               affecting the other words.
-////////////////////////////////////////////////////////////////////
+/**
+ * Changes the nth word to the indicated value without affecting the other
+ * words.
+ */
 void ConfigDeclaration::
-set_int64_word(int n, PN_int64 value) {
+set_int64_word(size_t n, int64_t value) {
   set_string_word(n, format_string(value));
 
   _words[n]._flags |= (F_checked_int64 | F_valid_int64);
@@ -130,14 +116,12 @@ set_int64_word(int n, PN_int64 value) {
   invalidate_cache();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::set_double_word
-//       Access: Public
-//  Description: Changes the nth word to the indicated value without
-//               affecting the other words.
-////////////////////////////////////////////////////////////////////
+/**
+ * Changes the nth word to the indicated value without affecting the other
+ * words.
+ */
 void ConfigDeclaration::
-set_double_word(int n, double value) {
+set_double_word(size_t n, double value) {
   set_string_word(n, format_string(value));
 
   _words[n]._flags |= (F_checked_double | F_valid_double);
@@ -145,35 +129,27 @@ set_double_word(int n, double value) {
   invalidate_cache();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::output
-//       Access: Public
-//  Description: 
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void ConfigDeclaration::
 output(ostream &out) const {
   out << get_variable()->get_name() << " " << get_string_value();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::write
-//       Access: Public
-//  Description: 
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void ConfigDeclaration::
 write(ostream &out) const {
   out << get_variable()->get_name() << " " << get_string_value();
-  if (!get_variable()->is_used()) {
-    out << "  (not used)";
-  }
+  // if (!get_variable()->is_used()) { out << "  (not used)"; }
   out << "\n";
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::get_words
-//       Access: Private
-//  Description: Separates the string value into words.
-////////////////////////////////////////////////////////////////////
+/**
+ * Separates the string value into words.
+ */
 void ConfigDeclaration::
 get_words() {
   if (!_got_words) {
@@ -195,19 +171,16 @@ get_words() {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::check_bool_word
-//       Access: Private
-//  Description: Checks whether the nth word can be interpreted as a
-//               boolean value.
-////////////////////////////////////////////////////////////////////
+/**
+ * Checks whether the nth word can be interpreted as a boolean value.
+ */
 void ConfigDeclaration::
-check_bool_word(int n) {
+check_bool_word(size_t n) {
   if (!_got_words) {
     get_words();
   }
 
-  if (n >= 0 && n < (int)_words.size()) {
+  if (n < _words.size()) {
     Word &word = _words[n];
     if ((word._flags & F_checked_bool) == 0) {
       word._flags |= F_checked_bool;
@@ -242,25 +215,22 @@ check_bool_word(int n) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::check_int_word
-//       Access: Private
-//  Description: Checks whether the nth word can be interpreted as an
-//               integer value.
-////////////////////////////////////////////////////////////////////
+/**
+ * Checks whether the nth word can be interpreted as an integer value.
+ */
 void ConfigDeclaration::
-check_int_word(int n) {
+check_int_word(size_t n) {
   if (!_got_words) {
     get_words();
   }
 
-  if (n >= 0 && n < (int)_words.size()) {
+  if (n < _words.size()) {
     Word &word = _words[n];
     if ((word._flags & F_checked_int) == 0) {
       word._flags |= F_checked_int;
 
-      // We scan the word by hand, rather than relying on strtol(), so
-      // we can check for overflow of the 32-bit value.
+      // We scan the word by hand, rather than relying on strtol(), so we can
+      // check for overflow of the 32-bit value.
       word._int = 0;
       bool overflow = false;
 
@@ -302,19 +272,16 @@ check_int_word(int n) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::check_int64_word
-//       Access: Private
-//  Description: Checks whether the nth word can be interpreted as an
-//               integer value.
-////////////////////////////////////////////////////////////////////
+/**
+ * Checks whether the nth word can be interpreted as an integer value.
+ */
 void ConfigDeclaration::
-check_int64_word(int n) {
+check_int64_word(size_t n) {
   if (!_got_words) {
     get_words();
   }
 
-  if (n >= 0 && n < (int)_words.size()) {
+  if (n < _words.size()) {
     Word &word = _words[n];
     if ((word._flags & F_checked_int64) == 0) {
       word._flags |= F_checked_int64;
@@ -327,8 +294,8 @@ check_int64_word(int n) {
         ++pi;
         // Negative number.
         while (pi != word._str.end() && isdigit(*pi)) {
-          PN_int64 next = word._int_64 * 10 - (int)((*pi) - '0');
-          if ((PN_int64)(next / 10) != word._int_64) {
+          int64_t next = word._int_64 * 10 - (int)((*pi) - '0');
+          if ((int64_t)(next / 10) != word._int_64) {
             // Overflow.
             overflow = true;
           }
@@ -339,8 +306,8 @@ check_int64_word(int n) {
       } else {
         // Positive number.
         while (pi != word._str.end() && isdigit(*pi)) {
-          PN_int64 next = word._int_64 * 10 + (int)((*pi) - '0');
-          if ((PN_int64)(next / 10) != word._int_64) {
+          int64_t next = word._int_64 * 10 + (int)((*pi) - '0');
+          if ((int64_t)(next / 10) != word._int_64) {
             // Overflow.
             overflow = true;
           }
@@ -360,19 +327,16 @@ check_int64_word(int n) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::check_double_word
-//       Access: Private
-//  Description: Checks whether the nth word can be interpreted as a
-//               floating-point value.
-////////////////////////////////////////////////////////////////////
+/**
+ * Checks whether the nth word can be interpreted as a floating-point value.
+ */
 void ConfigDeclaration::
-check_double_word(int n) {
+check_double_word(size_t n) {
   if (!_got_words) {
     get_words();
   }
 
-  if (n >= 0 && n < (int)_words.size()) {
+  if (n < _words.size()) {
     Word &word = _words[n];
     if ((word._flags & F_checked_double) == 0) {
       word._flags |= F_checked_double;
@@ -392,20 +356,17 @@ check_double_word(int n) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::extract_words
-//       Access: Public, Static
-//  Description: Divides the string into a number of words according
-//               to whitespace.  The words vector should be cleared by
-//               the user before calling; otherwise, the list of words
-//               in the string will be appended to the end of whatever
-//               was there before.
-//
-//               The return value is the number of words extracted.
-////////////////////////////////////////////////////////////////////
-int ConfigDeclaration::
+/**
+ * Divides the string into a number of words according to whitespace.  The
+ * words vector should be cleared by the user before calling; otherwise, the
+ * list of words in the string will be appended to the end of whatever was
+ * there before.
+ *
+ * The return value is the number of words extracted.
+ */
+size_t ConfigDeclaration::
 extract_words(const string &str, vector_string &words) {
-  int num_words = 0;
+  size_t num_words = 0;
 
   size_t pos = 0;
   while (pos < str.length() && isspace((unsigned int)str[pos])) {
@@ -427,19 +388,16 @@ extract_words(const string &str, vector_string &words) {
   return num_words;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: ConfigDeclaration::downcase
-//       Access: Public, Static
-//  Description: Returns the input string with all uppercase letters
-//               converted to lowercase.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the input string with all uppercase letters converted to lowercase.
+ */
 string ConfigDeclaration::
 downcase(const string &s) {
   string result;
   result.reserve(s.size());
   string::const_iterator p;
   for (p = s.begin(); p != s.end(); ++p) {
-    result += tolower(*p);
+    result += (char)tolower(*p);
   }
   return result;
 }

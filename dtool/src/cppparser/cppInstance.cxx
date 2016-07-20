@@ -1,17 +1,15 @@
-// Filename: cppInstance.cxx
-// Created by:  drose (19Oct99)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
-
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file cppInstance.cxx
+ * @author drose
+ * @date 1999-10-19
+ */
 
 #include "cppInstance.h"
 #include "cppInstanceIdentifier.h"
@@ -28,104 +26,95 @@
 
 #include <algorithm>
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPPInstance::
 CPPInstance(CPPType *type, const string &name, int storage_class) :
   CPPDeclaration(CPPFile()),
   _type(type),
   _ident(new CPPIdentifier(name)),
-  _storage_class(storage_class)
+  _storage_class(storage_class),
+  _alignment(NULL),
+  _bit_width(-1)
 {
   _initializer = NULL;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPPInstance::
 CPPInstance(CPPType *type, CPPIdentifier *ident, int storage_class) :
   CPPDeclaration(CPPFile()),
   _type(type),
   _ident(ident),
-  _storage_class(storage_class)
+  _storage_class(storage_class),
+  _alignment(NULL),
+  _bit_width(-1)
 {
   _initializer = NULL;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::Constructor
-//       Access: Public
-//  Description: Constructs a new CPPInstance object that defines a
-//               variable of the indicated type according to the type
-//               and the InstanceIdentifier.  The InstanceIdentifier
-//               pointer is deallocated.
-////////////////////////////////////////////////////////////////////
+/**
+ * Constructs a new CPPInstance object that defines a variable of the
+ * indicated type according to the type and the InstanceIdentifier.  The
+ * InstanceIdentifier pointer is deallocated.
+ */
 CPPInstance::
 CPPInstance(CPPType *type, CPPInstanceIdentifier *ii, int storage_class,
             const CPPFile &file) :
-  CPPDeclaration(file)
+  CPPDeclaration(file),
+  _alignment(NULL)
 {
   _type = ii->unroll_type(type);
   _ident = ii->_ident;
   ii->_ident = NULL;
   _storage_class = storage_class;
   _initializer = NULL;
+  _bit_width = ii->_bit_width;
 
   CPPParameterList *params = ii->get_initializer();
   if (params != (CPPParameterList *)NULL) {
-    // In this case, the instance has a parameter-list initializer, e.g.:
-    //
-    //   int foo(0);
-    //
-    // We really should save this initializer in the instance object.
-    // But we don't for now, since no one really cares about
-    // initializers anyway.
+    // In this case, the instance has a parameter-list initializer, e.g.: int
+    // foo(0); We really should save this initializer in the instance object.
+    // But we don't for now, since no one really cares about initializers
+    // anyway.
   }
 
   delete ii;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::Copy Constructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPPInstance::
 CPPInstance(const CPPInstance &copy) :
   CPPDeclaration(copy),
   _type(copy._type),
   _ident(copy._ident),
   _initializer(copy._initializer),
-  _storage_class(copy._storage_class)
+  _storage_class(copy._storage_class),
+  _alignment(copy._alignment),
+  _bit_width(copy._bit_width)
 {
   assert(_type != NULL);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::Destructor
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPPInstance::
 ~CPPInstance() {
   // Can't delete the identifier.  Don't try.
 }
 
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::make_typecast_function
-//       Access: Public, Static
-//  Description: Constructs and returns a new CPPInstance object that
-//               corresponds to a function prototype declaration for a
-//               typecast method, whose return type is implicit in the
-//               identifier type.
-////////////////////////////////////////////////////////////////////
+/**
+ * Constructs and returns a new CPPInstance object that corresponds to a
+ * function prototype declaration for a typecast method, whose return type is
+ * implicit in the identifier type.
+ */
 CPPInstance *CPPInstance::
 make_typecast_function(CPPInstance *inst, CPPIdentifier *ident,
                        CPPParameterList *parameters, int function_flags) {
@@ -140,11 +129,9 @@ make_typecast_function(CPPInstance *inst, CPPIdentifier *ident,
   return new CPPInstance(ft, ident);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::Equivalence Operator
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool CPPInstance::
 operator == (const CPPInstance &other) const {
   if (_type != other._type) {
@@ -153,10 +140,12 @@ operator == (const CPPInstance &other) const {
   if (_storage_class != other._storage_class) {
     return false;
   }
+  if (_alignment != other._alignment) {
+    return false;
+  }
 
-  // We *do* care about the identifier.  We need to differentiate
-  // types of function variables, among possibly other things, based
-  // on the identifier.
+  // We *do* care about the identifier.  We need to differentiate types of
+  // function variables, among possibly other things, based on the identifier.
   if ((_ident == NULL && other._ident != NULL) ||
       (_ident != NULL && other._ident == NULL) ||
       (_ident != NULL && other._ident != NULL && *_ident != *other._ident))
@@ -176,21 +165,17 @@ operator == (const CPPInstance &other) const {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::Nonequivalence Operator
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool CPPInstance::
 operator != (const CPPInstance &other) const {
   return !operator == (other);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::Ordering Operator
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool CPPInstance::
 operator < (const CPPInstance &other) const {
   if (_type != other._type) {
@@ -199,10 +184,12 @@ operator < (const CPPInstance &other) const {
   if (_storage_class != other._storage_class) {
     return _storage_class < other._storage_class;
   }
+  if (_alignment != other._alignment) {
+    return _alignment < other._alignment;
+  }
 
-  // We *do* care about the identifier.  We need to differentiate
-  // types of function variables, among possibly other things, based
-  // on the identifier.
+  // We *do* care about the identifier.  We need to differentiate types of
+  // function variables, among possibly other things, based on the identifier.
   if ((_ident == NULL && other._ident != NULL) ||
       (_ident != NULL && other._ident == NULL) ||
       (_ident != NULL && other._ident != NULL && *_ident != *other._ident))
@@ -228,35 +215,55 @@ operator < (const CPPInstance &other) const {
   return false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::set_initializer
-//       Access: Public
-//  Description: Sets the value of the expression that is used to
-//               initialize the variable, or the default value for a
-//               parameter.  If a non-null expression is set on a
-//               function declaration, it implies that the function is
-//               pure virtual.
-////////////////////////////////////////////////////////////////////
+/**
+ * Sets the value of the expression that is used to initialize the variable,
+ * or the default value for a parameter.  If a non-null expression is set on a
+ * function declaration, it implies that the function is pure virtual.
+ */
 void CPPInstance::
 set_initializer(CPPExpression *initializer) {
   if (_type->as_function_type() != (CPPFunctionType *)NULL) {
     // This is a function declaration.
-    if (initializer == (CPPExpression *)NULL) {
-      _storage_class &= ~SC_pure_virtual;
-    } else {
-      _storage_class |= SC_pure_virtual;
-    }
+    _storage_class &= ~(SC_pure_virtual | SC_defaulted | SC_deleted);
     _initializer = (CPPExpression *)NULL;
+
+    if (initializer != (CPPExpression *)NULL) {
+      if (initializer->_type == CPPExpression::T_integer) { // = 0
+        _storage_class |= SC_pure_virtual;
+
+      } else if (initializer->_type == CPPExpression::T_default) {
+        _storage_class |= SC_defaulted;
+
+      } else if (initializer->_type == CPPExpression::T_delete) {
+        _storage_class |= SC_deleted;
+      }
+    }
   } else {
     _initializer = initializer;
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::is_scoped
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ * Sets the number of bytes to align this instance to.
+ */
+void CPPInstance::
+set_alignment(int align) {
+  _alignment = new CPPExpression(align);
+}
+
+/**
+ * Sets the expression that is used to determine the required alignment for
+ * the variable.  This should be a constant expression, but we don't presently
+ * verify that it is.
+ */
+void CPPInstance::
+set_alignment(CPPExpression *const_expr) {
+  _alignment = const_expr;
+}
+
+/**
+ *
+ */
 bool CPPInstance::
 is_scoped() const {
   if (_ident == NULL) {
@@ -266,11 +273,9 @@ is_scoped() const {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::get_scope
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPPScope *CPPInstance::
 get_scope(CPPScope *current_scope, CPPScope *global_scope,
           CPPPreprocessor *error_sink) const {
@@ -281,11 +286,9 @@ get_scope(CPPScope *current_scope, CPPScope *global_scope,
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::get_simple_name
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 string CPPInstance::
 get_simple_name() const {
   if (_ident == NULL) {
@@ -295,11 +298,9 @@ get_simple_name() const {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::get_local_name
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 string CPPInstance::
 get_local_name(CPPScope *scope) const {
   if (_ident == NULL) {
@@ -309,11 +310,9 @@ get_local_name(CPPScope *scope) const {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::get_fully_scoped_name
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 string CPPInstance::
 get_fully_scoped_name() const {
   if (_ident == NULL) {
@@ -323,13 +322,11 @@ get_fully_scoped_name() const {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::check_for_constructor
-//       Access: Public
-//  Description: If this is a function type instance, checks whether
-//               the function name matches the class name (or ~name),
-//               and if so, flags it as a constructor (or destructor).
-////////////////////////////////////////////////////////////////////
+/**
+ * If this is a function type instance, checks whether the function name
+ * matches the class name (or ~name), and if so, flags it as a constructor (or
+ * destructor).
+ */
 void CPPInstance::
 check_for_constructor(CPPScope *current_scope, CPPScope *global_scope) {
   CPPScope *scope = get_scope(current_scope, global_scope);
@@ -347,9 +344,33 @@ check_for_constructor(CPPScope *current_scope, CPPScope *global_scope) {
         CPPType *void_type = CPPType::new_type
           (new CPPSimpleType(CPPSimpleType::T_void));
 
+        int flags = func->_flags | CPPFunctionType::F_constructor;
+
+        // Check if it might be a copy or move constructor.
+        CPPParameterList *params = func->_parameters;
+        if (params->_parameters.size() == 1 && !params->_includes_ellipsis) {
+          CPPType *param_type = params->_parameters[0]->_type;
+          CPPReferenceType *ref_type = param_type->as_reference_type();
+
+          if (ref_type != NULL) {
+            param_type = ref_type->_pointing_at;
+
+            if (param_type->get_subtype() == CPPDeclaration::ST_const) {
+              param_type = param_type->as_const_type()->_wrapped_around;
+            }
+
+            if (class_name == param_type->get_simple_name()) {
+              if (ref_type->_value_category == CPPReferenceType::VC_rvalue) {
+                flags |= CPPFunctionType::F_move_constructor;
+              } else {
+                flags |= CPPFunctionType::F_copy_constructor;
+              }
+            }
+          }
+        }
+
         _type = CPPType::new_type
-          (new CPPFunctionType(void_type, func->_parameters,
-                               func->_flags | CPPFunctionType::F_constructor));
+          (new CPPFunctionType(void_type, func->_parameters, flags));
 
       } else if (method_name == "~" + class_name) {
         CPPType *void_type = CPPType::new_type
@@ -363,11 +384,9 @@ check_for_constructor(CPPScope *current_scope, CPPScope *global_scope) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::instantiate
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPPDeclaration *CPPInstance::
 instantiate(const CPPTemplateParameterList *actual_params,
             CPPScope *current_scope, CPPScope *global_scope,
@@ -384,8 +403,8 @@ instantiate(const CPPTemplateParameterList *actual_params,
   Instantiations::const_iterator ii;
   ii = _instantiations.find(actual_params);
   if (ii != _instantiations.end()) {
-    // We've already instantiated this instance with these parameters.
-    // Return that.
+    // We've already instantiated this instance with these parameters.  Return
+    // that.
     return (*ii).second;
   }
 
@@ -400,8 +419,8 @@ instantiate(const CPPTemplateParameterList *actual_params,
     ((CPPInstance *)this)->substitute_decl(subst, current_scope, global_scope)
     ->as_instance();
   if (inst == this) {
-    // Hmm, nothing to substitute.  Make a new instance anyway, so we
-    // can change the name.
+    // Hmm, nothing to substitute.  Make a new instance anyway, so we can
+    // change the name.
     inst = new CPPInstance(*this);
   }
   assert(inst != NULL);
@@ -418,14 +437,11 @@ instantiate(const CPPTemplateParameterList *actual_params,
   return inst;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::is_fully_specified
-//       Access: Public, Virtual
-//  Description: Returns true if this declaration is an actual,
-//               factual declaration, or false if some part of the
-//               declaration depends on a template parameter which has
-//               not yet been instantiated.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if this declaration is an actual, factual declaration, or
+ * false if some part of the declaration depends on a template parameter which
+ * has not yet been instantiated.
+ */
 bool CPPInstance::
 is_fully_specified() const {
   if (_ident != NULL && !_ident->is_fully_specified()) {
@@ -438,11 +454,9 @@ is_fully_specified() const {
     _type->is_fully_specified();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::substitute_decl
-//       Access: Public, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPPDeclaration *CPPInstance::
 substitute_decl(CPPDeclaration::SubstDecl &subst,
                 CPPScope *current_scope, CPPScope *global_scope) {
@@ -477,33 +491,27 @@ substitute_decl(CPPDeclaration::SubstDecl &subst,
   return rep;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::output
-//       Access: Public, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void CPPInstance::
 output(ostream &out, int indent_level, CPPScope *scope, bool complete) const {
   output(out, indent_level, scope, complete, -1);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::output
-//       Access: Public
-//  Description: The extra parameter comes into play only when we
-//               happen to be outputting a function prototype.  See
-//               CPPFunctionType::output().
-////////////////////////////////////////////////////////////////////
+/**
+ * The extra parameter comes into play only when we happen to be outputting a
+ * function prototype.  See CPPFunctionType::output().
+ */
 void CPPInstance::
 output(ostream &out, int indent_level, CPPScope *scope, bool complete,
        int num_default_parameters) const {
   assert(_type != NULL);
 
   if (_type->is_parameter_expr()) {
-    // In this case, the whole thing is really an expression, and not
-    // an instance at all.  This can only happen if we parsed an
-    // instance declaration while we thought we were parsing a
-    // function prototype.
+    // In this case, the whole thing is really an expression, and not an
+    // instance at all.  This can only happen if we parsed an instance
+    // declaration while we thought we were parsing a function prototype.
     out << *_initializer;
     return;
   }
@@ -512,6 +520,11 @@ output(ostream &out, int indent_level, CPPScope *scope, bool complete,
     get_template_scope()->_parameters.write_formal(out, scope);
     indent(out, indent_level);
   }
+
+  if (_alignment != NULL) {
+    out << "alignas(" << *_alignment << ") ";
+  }
+
   if (_storage_class & SC_static) {
     out << "static ";
   }
@@ -539,6 +552,12 @@ output(ostream &out, int indent_level, CPPScope *scope, bool complete,
   if (_storage_class & SC_mutable) {
     out << "mutable ";
   }
+  if (_storage_class & SC_constexpr) {
+    out << "constexpr ";
+  }
+  if (_storage_class & SC_thread_local) {
+    out << "thread_local ";
+  }
 
   string name;
   if (_ident != NULL) {
@@ -554,8 +573,18 @@ output(ostream &out, int indent_level, CPPScope *scope, bool complete,
     _type->output_instance(out, indent_level, scope, complete, "", name);
   }
 
+  if (_bit_width != -1) {
+    out << " : " << _bit_width;
+  }
+
   if (_storage_class & SC_pure_virtual) {
     out << " = 0";
+  }
+  if (_storage_class & SC_defaulted) {
+    out << " = default";
+  }
+  if (_storage_class & SC_deleted) {
+    out << " = delete";
   }
   if (_initializer != NULL) {
     out << " = " << *_initializer;
@@ -563,21 +592,17 @@ output(ostream &out, int indent_level, CPPScope *scope, bool complete,
 }
 
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::get_subtype
-//       Access: Public, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPPDeclaration::SubType CPPInstance::
 get_subtype() const {
   return ST_instance;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: CPPInstance::as_instance
-//       Access: Public, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 CPPInstance *CPPInstance::
 as_instance() {
   return this;

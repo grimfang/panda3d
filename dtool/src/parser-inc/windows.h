@@ -1,16 +1,15 @@
-// Filename: windows.h
-// Created by:  drose (17Aug00)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file windows.h
+ * @author drose
+ * @date 2000-08-17
+ */
 
 // This file, and all the other files in this directory, aren't
 // intended to be compiled--they're just parsed by CPPParser (and
@@ -20,23 +19,44 @@
 #ifndef WINDOWS_H
 #define WINDOWS_H
 
+#include <wtypes.h>
+
+#ifdef _WIN64
+typedef int HALF_PTR;
+typedef long long INT_PTR;
+typedef long long LONG_PTR;
+typedef unsigned long long UINT_PTR;
+typedef unsigned long long ULONG_PTR;
+#else
+typedef short HALF_PTR;
+typedef int INT_PTR;
+typedef long LONG_PTR;
+typedef unsigned int UINT_PTR;
+typedef unsigned long ULONG_PTR;
+#endif
+
 // http://msdn.microsoft.com/en-us/library/cc230309.aspx
 typedef bool BOOL;
-typedef long DWORD;
+typedef unsigned long DWORD;
 typedef long LONG;
 typedef long UINT;
 typedef unsigned long ULONG;
-typedef signed long long LONGLONG;
+typedef long long LONGLONG;
 typedef long HRESULT;
 typedef int CRITICAL_SECTION;
-typedef int HANDLE;
-typedef int HGLOBAL;
-typedef int HWAVEIN;
 typedef void *LPSTR;
 typedef void *LPWAVEHDR;
+typedef void *PVOID;
 typedef void *LPVOID;
-typedef void *DWORD_PTR;
-typedef unsigned short WCHAR;
+typedef PVOID HANDLE;
+typedef HANDLE HGLOBAL;
+typedef HANDLE HWAVEIN;
+typedef HANDLE HWND;
+typedef ULONG_PTR DWORD_PTR;
+typedef DWORD_PTR *PDWORD_PTR;
+typedef UINT_PTR WPARAM;
+typedef LONG_PTR LPARAM;
+typedef wchar_t WCHAR;
 typedef WCHAR *BSTR;
 typedef struct _MediaType AM_MEDIA_TYPE;
 typedef struct _VIDEO_STREAM_CONFIG_CAPS VIDEO_STREAM_CONFIG_CAPS;
@@ -48,10 +68,6 @@ typedef struct _FILTERKEYS FILTERKEYS;
 #define CALLBACK
 
 #define WINAPI
-
-union LARGE_INTEGER {
-  long long QuadPart;
-};
 
 class IGraphBuilder;
 class ICaptureGraphBuilder2;

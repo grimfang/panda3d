@@ -1,4 +1,4 @@
-import types
+__all__ = ["SeqValue"]
 
 class SeqValue:
 
@@ -19,23 +19,23 @@ class SeqValue:
     def set(self, value):
         """ Sets the seq from the indicated value of unspecified
         type. """
-        if isinstance(value, types.TupleType):
+        if isinstance(value, tuple):
             self.setFromTuple(value)
-        elif isinstance(value, types.StringTypes):
+        elif isinstance(value, str):
             self.setFromString(value)
         else:
-            raise TypeError, 'Invalid sequence type: %s' % (value,)
+            raise TypeError('Invalid sequence type: %s' % (value,))
 
     def setFromTuple(self, value):
         """ Sets the seq from the indicated tuple of integers. """
-        assert isinstance(value, types.TupleType)
+        assert isinstance(value, tuple)
         self.value = value
 
     def setFromString(self, value):
         """ Sets the seq from the indicated string of dot-separated
         integers.  Raises ValueError on error. """
-        assert isinstance(value, types.StringTypes)
-        
+        assert isinstance(value, str)
+
         self.value = ()
         if value:
             value = value.split('.')
@@ -77,9 +77,14 @@ class SeqValue:
         """ Compares to another seq value. """
         return cmp(self.value, other.value)
 
+    def __lt__(self, other):
+        return self.value < other.value
+
+    def __gt__(self, other):
+        return self.value > other.value
+
     def __bool__(self):
         return bool(self.value)
 
     def __str__(self):
         return 'SeqValue%s' % (repr(self.value))
-    

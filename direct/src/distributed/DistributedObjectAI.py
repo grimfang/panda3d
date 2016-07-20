@@ -3,7 +3,8 @@
 from direct.directnotify.DirectNotifyGlobal import directNotify
 from direct.distributed.DistributedObjectBase import DistributedObjectBase
 from direct.showbase import PythonUtil
-from pandac.PandaModules import *
+from panda3d.core import *
+from panda3d.direct import *
 #from PyDatagram import PyDatagram
 #from PyDatagramIterator import PyDatagramIterator
 
@@ -56,25 +57,26 @@ class DistributedObjectAI(DistributedObjectBase):
         def status(self, indent=0):
             """
             print out doId(parentId, zoneId) className
-                and conditionally show generated, disabled, neverDisable,
-                or cachable
+                and conditionally show generated or deleted
             """
-            spaces=' '*(indent+2)
+            spaces = ' ' * (indent + 2)
             try:
-                print "%s%s:"%(
-                    ' '*indent, self.__class__.__name__)
-                print "%sfrom DistributedObject doId:%s, parent:%s, zone:%s"%(
-                    spaces,
-                    self.doId, self.parentId, self.zoneId),
-                flags=[]
+                print("%s%s:" % (' ' * indent, self.__class__.__name__))
+
+                flags = []
                 if self.__generated:
                     flags.append("generated")
                 if self.air == None:
                     flags.append("deleted")
+
+                flagStr = ""
                 if len(flags):
-                    print "(%s)"%(" ".join(flags),),
-                print
-            except Exception, e: print "%serror printing status"%(spaces,), e
+                    flagStr = " (%s)" % (" ".join(flags))
+
+                print("%sfrom DistributedObject doId:%s, parent:%s, zone:%s%s" % (
+                    spaces, self.doId, self.parentId, self.zoneId, flagStr))
+            except Exception as e:
+                print("%serror printing status %s" % (spaces, e))
 
     def getDeleteEvent(self):
         # this is sent just before we get deleted
@@ -242,13 +244,13 @@ class DistributedObjectAI(DistributedObjectBase):
 
     def postGenerateMessage(self):
         self.__generated = True
-        messenger.send(self.uniqueName("generate"), [self])        
+        messenger.send(self.uniqueName("generate"), [self])
 
     def updateRequiredFields(self, dclass, di):
         dclass.receiveUpdateBroadcastRequired(self, di)
         self.announceGenerate()
         self.postGenerateMessage()
-        
+
     def updateAllRequiredFields(self, dclass, di):
         dclass.receiveUpdateAllRequired(self, di)
         self.announceGenerate()
@@ -260,7 +262,7 @@ class DistributedObjectAI(DistributedObjectBase):
         # but before we update the non-required fields.
         self.announceGenerate()
         self.postGenerateMessage()
-        
+
         dclass.receiveUpdateOther(self, di)
 
     def updateAllRequiredOtherFields(self, dclass, di):
@@ -269,7 +271,7 @@ class DistributedObjectAI(DistributedObjectBase):
         # but before we update the non-required fields.
         self.announceGenerate()
         self.postGenerateMessage()
-        
+
         dclass.receiveUpdateOther(self, di)
 
     def sendSetZone(self, zoneId):
@@ -347,16 +349,16 @@ class DistributedObjectAI(DistributedObjectBase):
             self.air.sendUpdate(self, fieldName, args)
 
     def GetPuppetConnectionChannel(self, doId):
-        return doId + (1L << 32)
+        return doId + (1 << 32)
 
     def GetAccountConnectionChannel(self, doId):
-        return doId + (3L << 32)
+        return doId + (3 << 32)
 
     def GetAccountIDFromChannelCode(self, channel):
         return channel >> 32
 
     def GetAvatarIDFromChannelCode(self, channel):
-        return channel & 0xffffffffL
+        return channel & 0xffffffff
 
     def sendUpdateToAvatarId(self, avId, fieldName, args):
         assert self.notify.debugStateCall(self)
@@ -387,7 +389,7 @@ class DistributedObjectAI(DistributedObjectBase):
         self.generate()
         self.announceGenerate()
         self.postGenerateMessage()
-        
+
     # this is a special generate used for estates, or anything else that
     # needs to have a hard coded doId as assigned by the server
     def generateWithRequiredAndId(self, doId, parentId, zoneId, optionalFields=[]):
@@ -402,7 +404,7 @@ class DistributedObjectAI(DistributedObjectBase):
         self.generate()
         self.announceGenerate()
         self.postGenerateMessage()
-        
+
     def generateOtpObject(self, parentId, zoneId, optionalFields=[], doId=None):
         assert self.notify.debugStateCall(self)
         # have we already allocated a doId?
@@ -574,8 +576,8 @@ class DistributedObjectAI(DistributedObjectBase):
 
     def execCommand(self, string, mwMgrId, avId, zoneId):
         pass
-    
+
     def _retrieveCachedData(self):
         """ This is a no-op on the AI. """
         pass
-    
+

@@ -1,16 +1,15 @@
-// Filename: dxVertexBufferContext9.h
-// Created by:  drose (18Mar05)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file dxVertexBufferContext9.h
+ * @author drose
+ * @date 2005-03-18
+ */
 
 #ifndef DXVERTEXBUFFERCONTEXT9_H
 #define DXVERTEXBUFFERCONTEXT9_H
@@ -20,19 +19,17 @@
 #include "vertexBufferContext.h"
 #include "deletedChain.h"
 
-class CLP(GraphicsStateGuardian);
+class DXGraphicsStateGuardian9;
 
-////////////////////////////////////////////////////////////////////
-//       Class : DXVertexBufferContext9
-// Description : Caches a GeomVertexArrayData in the DirectX device as
-//               a vertex buffer.
-////////////////////////////////////////////////////////////////////
-class EXPCL_PANDADX CLP(VertexBufferContext) : public VertexBufferContext {
+/**
+ * Caches a GeomVertexArrayData in the DirectX device as a vertex buffer.
+ */
+class EXPCL_PANDADX DXVertexBufferContext9 : public VertexBufferContext {
 public:
-  CLP(VertexBufferContext)(CLP(GraphicsStateGuardian) *dxgsg,
+  DXVertexBufferContext9(DXGraphicsStateGuardian9 *dxgsg,
                            PreparedGraphicsObjects *pgo,
                            GeomVertexArrayData *data);
-  ALLOC_DELETED_CHAIN(CLP(VertexBufferContext));
+  ALLOC_DELETED_CHAIN(DXVertexBufferContext9);
 
   virtual void evict_lru();
 

@@ -32,16 +32,28 @@ class tk(package):
     #config(gui_app = True)
     require('panda3d')
 
-    module('Tkinter', '_tkinter', required = True)
-    module('Tkconstants', 'Tkdnd', 'Tix', 'ScrolledText', 'turtle',
-           'tkColorChooser', 'tkCommonDialog', 'tkFileDialog',
-           'tkFont', 'tkMessageBox', 'tkSimpleDialog')
+    if sys.version_info >= (3, 0):
+        module('tkinter', '_tkinter', required = True)
+        module('tkinter.colorchooser', 'tkinter.commondialog',
+               'tkinter.constants', 'tkinter.dialog', 'tkinter.dnd',
+               'tkinter.filedialog', 'tkinter.font', 'tkinter.messagebox',
+               'tkinter.scrolledtext', 'tkinter.simpledialog', 'tkinter.tix',
+               'tkinter.ttk')
+    else:
+        module('Tkinter', '_tkinter', required = True)
+        module('Tkconstants', 'Tkdnd', 'Tix', 'ScrolledText', 'turtle',
+               'tkColorChooser', 'tkCommonDialog', 'tkFileDialog',
+               'tkFont', 'tkMessageBox', 'tkSimpleDialog')
+
     module('direct.showbase.TkGlobal',
            'direct.tkpanels',
            'direct.tkwidgets')
 
     try:
-        from Tkinter import Tcl
+        if sys.version_info >= (3, 0):
+            from tkinter import Tcl
+        else:
+            from Tkinter import Tcl
         tcl = Tcl()
         dir = Filename.fromOsSpecific(tcl.eval("info library"))
         ver = tcl.eval("info tclversion")
@@ -137,7 +149,7 @@ class pyopengl(package):
     module('OpenGL.GLU', 'OpenGL.GLUT', 'OpenGL.GLE', 'OpenGL.GLX')
 
 class httplib2(package):
-    config(display_name = "httplib2")
+    config(display_name = "httplib2", platform_specific = False)
     require('panda3d')
 
     module('httplib2', required = True)
@@ -149,7 +161,7 @@ class box2d(package):
     module('Box2D', required = True)
 
 class pyglet(package):
-    config(display_name = "pyglet")
-    require('panda3d')
+    config(display_name = "pyglet", platform_specific = False)
+    require('panda3d', 'morepy')
 
     module('pyglet', required = True)

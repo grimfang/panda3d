@@ -1,16 +1,15 @@
-// Filename: pfstream.h
-// Created by:  cary (27Aug98)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file pfstream.h
+ * @author cary
+ * @date 1998-08-27
+ */
 
 #ifndef __PFSTREAM_H__
 #define __PFSTREAM_H__
@@ -20,6 +19,10 @@
 class EXPCL_DTOOL IPipeStream : public istream {
 PUBLISHED:
   INLINE IPipeStream(const std::string);
+
+#if _MSC_VER >= 1800
+  INLINE IPipeStream(const IPipeStream &copy) = delete;
+#endif
 
   INLINE void flush();
 
@@ -33,6 +36,10 @@ class EXPCL_DTOOL OPipeStream : public ostream {
 PUBLISHED:
   INLINE OPipeStream(const std::string);
 
+#if _MSC_VER >= 1800
+  INLINE OPipeStream(const OPipeStream &copy) = delete;
+#endif
+
   INLINE void flush();
 
 private:
@@ -44,5 +51,3 @@ private:
 #include "pfstream.I"
 
 #endif /* __PFSTREAM_H__ */
-
-

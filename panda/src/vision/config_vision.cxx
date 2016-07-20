@@ -1,16 +1,15 @@
-// Filename: config_vision.cxx
-// Created by:  pro-rsoft (07Nov09)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file config_vision.cxx
+ * @author rdb
+ * @date 2009-11-07
+ */
 
 #include "config_vision.h"
 #include "openCVTexture.h"
@@ -31,14 +30,12 @@ ConfigureFn(config_vision) {
   init_libvision();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: init_libvision
-//  Description: Initializes the library.  This must be called at
-//               least once before any of the functions or classes in
-//               this library can be used.  Normally it will be
-//               called by the static initializers and need not be
-//               called explicitly, but special cases exist.
-////////////////////////////////////////////////////////////////////
+/**
+ * Initializes the library.  This must be called at least once before any of
+ * the functions or classes in this library can be used.  Normally it will be
+ * called by the static initializers and need not be called explicitly, but
+ * special cases exist.
+ */
 void
 init_libvision() {
   static bool initialized = false;
@@ -63,10 +60,9 @@ init_libvision() {
   PandaSystem *ps = PandaSystem::get_global_ptr();
   ps->add_system("OpenCV");
 
-  TexturePool *ts = TexturePool::get_global_ptr();
 #ifndef HAVE_FFMPEG
+  TexturePool *ts = TexturePool::get_global_ptr();
   ts->register_texture_type(OpenCVTexture::make_texture, "avi");
 #endif
 #endif
 }
-

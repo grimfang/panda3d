@@ -1,18 +1,21 @@
-// Filename: glmisc_src.cxx
-// Created by:  drose (09Feb04)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file glmisc_src.cxx
+ * @author drose
+ * @date 2004-02-09
+ */
 
 #include "pandaSystem.h"
+
+ConfigVariableInt gl_version
+  ("gl-version", "",
+   PRC_DESC("Set this to get an OpenGL context with a specific version."));
 
 ConfigVariableBool gl_support_fbo
   ("gl-support-fbo", true,
@@ -43,6 +46,12 @@ ConfigVariableBool gl_support_rescale_normal
             "extension if the GL claims to support it, or false not to use "
             "it even if it appears to be available.  (This appears to be "
             "buggy on some drivers.)"));
+
+ConfigVariableBool gl_support_texture_lod
+  ("gl-support-texture-lod", true,
+   PRC_DESC("Configure this true to enable the use of minmax LOD settings "
+            "and texture LOD bias settings.  Set this to false if you "
+            "suspect a driver bug."));
 
 ConfigVariableBool gl_ignore_filters
   ("gl-ignore-filters", false,
@@ -183,9 +192,11 @@ ConfigVariableBool gl_force_depth_stencil
   ("gl-force-depth-stencil", false,
    PRC_DESC("Temporary hack variable 7x00 vs 8x00 nVidia bug.  See glGraphicsStateGuardian_src.cxx."));
 
-ConfigVariableBool gl_matrix_palette
-  ("gl-matrix-palette", false,
-   PRC_DESC("Temporary hack variable protecting untested code.  See glGraphicsStateGuardian_src.cxx."));
+ConfigVariableBool gl_force_fbo_color
+  ("gl-force-fbo-color", true,
+   PRC_DESC("This is set to true to force all FBOs to have at least one "
+            "color attachment.  This is to work around an Intel driver "
+            "issue.  Set to false to allow depth-only FBOs."));
 
 ConfigVariableBool gl_check_errors
   ("gl-check-errors", false,
@@ -222,6 +233,12 @@ ConfigVariableBool gl_dump_compiled_shaders
             "programs to disk with a filename like glsl_program0.dump "
             "into the current directory."));
 
+ConfigVariableBool gl_validate_shaders
+  ("gl-validate-shaders", true,
+   PRC_DESC("Set this to true to enable glValidateShader the first time "
+            "a shader is bound.  This may cause helpful information about "
+            "shaders to be printed."));
+
 ConfigVariableBool gl_immutable_texture_storage
   ("gl-immutable-texture-storage", false,
    PRC_DESC("This configures Panda to pre-allocate immutable storage "
@@ -257,6 +274,10 @@ ConfigVariableBool gl_vertex_array_objects
             "vertex arrays.  This only has effect when vertex-arrays "
             "and vertex-buffers are both set.  This should usually be "
             "true unless you suspect a bug in the implementation. "));
+
+ConfigVariableBool gl_fixed_vertex_attrib_locations
+  ("gl-fixed-vertex-attrib-locations", false,
+   PRC_DESC("Experimental feature."));
 
 ConfigVariableBool gl_support_primitive_restart_index
   ("gl-support-primitive-restart-index", true,
@@ -297,6 +318,9 @@ void CLP(init_classes)() {
 #ifndef OPENGLES_1
   CLP(ShaderContext)::init_type();
 #endif
+#if defined(HAVE_CG) && !defined(OPENGLES)
+  CLP(CgShaderContext)::init_type();
+#endif
   CLP(TextureContext)::init_type();
 #ifndef OPENGLES
   CLP(SamplerContext)::init_type();
@@ -313,7 +337,7 @@ void CLP(init_classes)() {
   PandaSystem *ps = PandaSystem::get_global_ptr();
   ps->add_system(GLSYSTEM_NAME);
 
-  // We can't add any tags defining the available OpenGL capabilities,
-  // since we won't know those until we create a graphics context (and
-  // the answer may be different for different contexts).
+  // We can't add any tags defining the available OpenGL capabilities, since
+  // we won't know those until we create a graphics context (and the answer
+  // may be different for different contexts).
 }

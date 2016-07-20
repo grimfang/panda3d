@@ -1,16 +1,15 @@
-// Filename: renderState.h
-// Created by:  drose (21Feb02)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file renderState.h
+ * @author drose
+ * @date 2002-02-21
+ */
 
 #ifndef RENDERSTATE_H
 #define RENDERSTATE_H
@@ -31,25 +30,22 @@
 #include "lightMutex.h"
 #include "deletedChain.h"
 #include "simpleHashMap.h"
+#include "weakKeyHashMap.h"
 #include "cacheStats.h"
 #include "renderAttribRegistry.h"
+#include "graphicsStateGuardianBase.h"
 
-class GraphicsStateGuardianBase;
 class FactoryParams;
 class ShaderAttrib;
 
-////////////////////////////////////////////////////////////////////
-//       Class : RenderState
-// Description : This represents a unique collection of RenderAttrib
-//               objects that correspond to a particular renderable
-//               state.
-//
-//               You should not attempt to create or modify a
-//               RenderState object directly.  Instead, call one of
-//               the make() functions to create one for you.  And
-//               instead of modifying a RenderState object, create a
-//               new one.
-////////////////////////////////////////////////////////////////////
+/**
+ * This represents a unique collection of RenderAttrib objects that correspond
+ * to a particular renderable state.
+ *
+ * You should not attempt to create or modify a RenderState object directly.
+ * Instead, call one of the make() functions to create one for you.  And
+ * instead of modifying a RenderState object, create a new one.
+ */
 class EXPCL_PANDA_PGRAPH RenderState : public NodeCachedReferenceCount {
 protected:
   RenderState();
@@ -76,7 +72,6 @@ PUBLISHED:
   bool cull_callback(CullTraverser *trav, const CullTraverserData &data) const;
 
   INLINE static CPT(RenderState) make_empty();
-  INLINE static CPT(RenderState) make_full_default();
   static CPT(RenderState) make(const RenderAttrib *attrib, int override = 0);
   static CPT(RenderState) make(const RenderAttrib *attrib1,
                                const RenderAttrib *attrib2, int override = 0);
@@ -87,6 +82,11 @@ PUBLISHED:
                                const RenderAttrib *attrib2,
                                const RenderAttrib *attrib3,
                                const RenderAttrib *attrib4, int override = 0);
+  static CPT(RenderState) make(const RenderAttrib *attrib1,
+                               const RenderAttrib *attrib2,
+                               const RenderAttrib *attrib3,
+                               const RenderAttrib *attrib4,
+                               const RenderAttrib *attrib5, int override = 0);
   static CPT(RenderState) make(const RenderAttrib * const *attrib,
                                int num_attribs, int override = 0);
 
@@ -104,7 +104,7 @@ PUBLISHED:
   INLINE bool has_attrib(TypeHandle type) const;
   INLINE bool has_attrib(int slot) const;
   INLINE const RenderAttrib *get_attrib(TypeHandle type) const;
-  INLINE const RenderAttrib *get_attrib(int slot) const;
+  ALWAYS_INLINE const RenderAttrib *get_attrib(int slot) const;
   INLINE const RenderAttrib *get_attrib_def(int slot) const;
   INLINE int get_override(TypeHandle type) const;
   INLINE int get_override(int slot) const;
@@ -118,15 +118,15 @@ PUBLISHED:
   INLINE void node_ref() const;
   INLINE bool node_unref() const;
 
-  INLINE int get_composition_cache_num_entries() const;
-  INLINE int get_invert_composition_cache_num_entries() const;
+  INLINE size_t get_composition_cache_num_entries() const;
+  INLINE size_t get_invert_composition_cache_num_entries() const;
 
-  INLINE int get_composition_cache_size() const;
-  INLINE const RenderState *get_composition_cache_source(int n) const;
-  INLINE const RenderState *get_composition_cache_result(int n) const;
-  INLINE int get_invert_composition_cache_size() const;
-  INLINE const RenderState *get_invert_composition_cache_source(int n) const;
-  INLINE const RenderState *get_invert_composition_cache_result(int n) const;
+  INLINE size_t get_composition_cache_size() const;
+  INLINE const RenderState *get_composition_cache_source(size_t n) const;
+  INLINE const RenderState *get_composition_cache_result(size_t n) const;
+  INLINE size_t get_invert_composition_cache_size() const;
+  INLINE const RenderState *get_invert_composition_cache_source(size_t n) const;
+  INLINE const RenderState *get_invert_composition_cache_result(size_t n) const;
   EXTENSION(PyObject *get_composition_cache() const);
   EXTENSION(PyObject *get_invert_composition_cache() const);
 
@@ -148,8 +148,8 @@ PUBLISHED:
   EXTENSION(static PyObject *get_states());
 
 PUBLISHED:
-  // These methods are intended for use by low-level code, but they're
-  // also handy enough to expose to high-level users.
+  // These methods are intended for use by low-level code, but they're also
+  // handy enough to expose to high-level users.
   INLINE int get_draw_order() const;
   INLINE int get_bin_index() const;
   int get_geom_rendering(int geom_rendering) const;
@@ -219,67 +219,65 @@ public:
   static void init_states();
 
   // If this state contains an "auto" ShaderAttrib, then an explicit
-  // ShaderAttrib will be synthesized by the runtime and stored here.
-  // I can't declare this as a ShaderAttrib because that would create
-  // a circular include-file dependency problem.  Aaargh.
+  // ShaderAttrib will be synthesized by the runtime and stored here.  I can't
+  // declare this as a ShaderAttrib because that would create a circular
+  // include-file dependency problem.  Aaargh.
   mutable CPT(RenderAttrib) _generated_shader;
 
 private:
-  // This mutex protects _states.  It also protects any modification
-  // to the cache, which is encoded in _composition_cache and
+  // This mutex protects _states.  It also protects any modification to the
+  // cache, which is encoded in _composition_cache and
   // _invert_composition_cache.
   static LightReMutex *_states_lock;
   class Empty {
   };
   typedef SimpleHashMap<const RenderState *, Empty, indirect_compare_to_hash<const RenderState *> > States;
   static States *_states;
-  static CPT(RenderState) _empty_state;
-  static CPT(RenderState) _full_default_state;
+  static const RenderState *_empty_state;
 
-  // This iterator records the entry corresponding to this
-  // RenderState object in the above global set.  We keep the index
-  // around so we can remove it when the RenderState destructs.
+  // This iterator records the entry corresponding to this RenderState object
+  // in the above global set.  We keep the index around so we can remove it
+  // when the RenderState destructs.
   int _saved_entry;
 
-  // This data structure manages the job of caching the composition of
-  // two RenderStates.  It's complicated because we have to be sure to
-  // remove the entry if *either* of the input RenderStates destructs.
-  // To implement this, we always record Composition entries in pairs,
-  // one in each of the two involved RenderState objects.
+  // This data structure manages the job of caching the composition of two
+  // RenderStates.  It's complicated because we have to be sure to remove the
+  // entry if *either* of the input RenderStates destructs.  To implement
+  // this, we always record Composition entries in pairs, one in each of the
+  // two involved RenderState objects.
   class Composition {
   public:
     INLINE Composition();
     INLINE Composition(const Composition &copy);
 
-    // _result is reference counted if and only if it is not the same
-    // pointer as this.
+    // _result is reference counted if and only if it is not the same pointer
+    // as this.
     const RenderState *_result;
   };
 
-  // The first element of the map is the object we compose with.  This
-  // is not reference counted within this map; instead we store a
-  // companion pointer in the other object, and remove the references
-  // explicitly when either object destructs.
+  // The first element of the map is the object we compose with.  This is not
+  // reference counted within this map; instead we store a companion pointer
+  // in the other object, and remove the references explicitly when either
+  // object destructs.
   typedef SimpleHashMap<const RenderState *, Composition, pointer_hash> CompositionCache;
   CompositionCache _composition_cache;
   CompositionCache _invert_composition_cache;
 
-  // This is here to provide a quick cache of GSG + RenderState ->
-  // GeomMunger for the cull phase.  It is here because it is faster
-  // to look up the GSG in the RenderState pointer than vice-versa,
-  // since there are likely to be far fewer GSG's than RenderStates.
-  // The code to manage this map lives in
+  // This is here to provide a quick cache of GSG + RenderState -> GeomMunger
+  // for the cull phase.  It is here because it is faster to look up the GSG
+  // in the RenderState pointer than vice-versa, since there are likely to be
+  // far fewer GSG's than RenderStates.  The code to manage this map lives in
   // GraphicsStateGuardian::get_geom_munger().
-  typedef pmap<WCPT(GraphicsStateGuardianBase), PT(GeomMunger) > Mungers;
-  Mungers _mungers;
-  Mungers::const_iterator _last_mi;
+  typedef WeakKeyHashMap<GraphicsStateGuardianBase, PT(GeomMunger) > Mungers;
+  mutable Mungers _mungers;
+  mutable int _last_mi;
 
   // This is used to mark nodes as we visit them to detect cycles.
   UpdateSeq _cycle_detect;
   static UpdateSeq _last_cycle_detect;
 
-  // This keeps track of our current position through the garbage
-  // collection cycle.
+  // This keeps track of our current position through the garbage collection
+  // cycle.
   static int _garbage_index;
 
   static PStatCollector _cache_update_pcollector;
@@ -293,8 +291,8 @@ private:
   static PStatCollector _cache_counter;
 
 private:
-  // This is the actual data within the RenderState: a set of
-  // max_slots RenderAttribs.
+  // This is the actual data within the RenderState: a set of max_slots
+  // RenderAttribs.
   class Attribute {
   public:
     INLINE Attribute(const RenderAttrib *attrib, int override);
@@ -307,14 +305,14 @@ private:
     CPT(RenderAttrib) _attrib;
     int _override;
   };
-  Attribute *_attributes;
+  Attribute _attributes[RenderAttribRegistry::_max_slots];
 
-  // We also store a bitmask of the non-NULL attributes in the above
-  // array.  This is redundant, but it is a useful cache.
+  // We also store a bitmask of the non-NULL attributes in the above array.
+  // This is redundant, but it is a useful cache.
   SlotMask _filled_slots;
 
-  // We cache the index to the associated CullBin, if there happens to
-  // be a CullBinAttrib in the state.
+  // We cache the index to the associated CullBin, if there happens to be a
+  // CullBinAttrib in the state.
   int _bin_index;
   int _draw_order;
   size_t _hash;
@@ -378,4 +376,3 @@ INLINE ostream &operator << (ostream &out, const RenderState &state) {
 #include "renderState.I"
 
 #endif
-

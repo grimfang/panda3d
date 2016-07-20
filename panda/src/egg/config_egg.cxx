@@ -1,16 +1,15 @@
-// Filename: config_egg.cxx
-// Created by:  drose (19Mar00)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file config_egg.cxx
+ * @author drose
+ * @date 2000-03-19
+ */
 
 #include "config_egg.h"
 #include "eggRenderMode.h"
@@ -126,7 +125,7 @@ ConfigVariableBool egg_consider_fans
           "vertex.  This may help if your scene involves lots of such "
           "connected triangles, but it can also make the overall stripping "
           "less effective (by interfering with triangle strips)."));
- 
+
 ConfigVariableDouble egg_max_tfan_angle
 ("egg-max-tfan-angle", 40.0,
  PRC_DESC("The maximum average angle per triangle to allow in a triangle "
@@ -160,14 +159,18 @@ ConfigVariableInt egg_recursion_limit
           "overflow.  Set it larger to run more efficiently if your stack "
           "allows it; set it lower if you experience stack overflows."));
 
-////////////////////////////////////////////////////////////////////
-//     Function: init_libegg
-//  Description: Initializes the library.  This must be called at
-//               least once before any of the functions or classes in
-//               this library can be used.  Normally it will be
-//               called by the static initializers and need not be
-//               called explicitly, but special cases exist.
-////////////////////////////////////////////////////////////////////
+ConfigVariableInt egg_precision
+("egg-precision", 15,
+ PRC_DESC("The number of digits of precision to write out for values in "
+          "an egg file.  Leave this at 0 to use the default setting for the "
+          "stream."));
+
+/**
+ * Initializes the library.  This must be called at least once before any of
+ * the functions or classes in this library can be used.  Normally it will be
+ * called by the static initializers and need not be called explicitly, but
+ * special cases exist.
+ */
 void
 init_libegg() {
   static bool initialized = false;

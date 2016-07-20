@@ -1,16 +1,15 @@
-// Filename: pythonThread.h
-// Created by:  drose (13Apr07)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file pythonThread.h
+ * @author drose
+ * @date 2007-04-13
+ */
 
 #ifndef PYTHONTHREAD_H
 #define PYTHONTHREAD_H
@@ -20,19 +19,27 @@
 #include "thread.h"
 
 #ifdef HAVE_PYTHON
-////////////////////////////////////////////////////////////////////
-//       Class : PythonThread
-// Description : This class is exposed to Python to allow creation of
-//               a Panda thread from the Python level.  It will spawn
-//               a thread that executes an arbitrary Python functor.
-////////////////////////////////////////////////////////////////////
-class EXPCL_PANDA_PIPELINE PythonThread : public Thread {
+/**
+ * This class is exposed to Python to allow creation of a Panda thread from
+ * the Python level.  It will spawn a thread that executes an arbitrary Python
+ * functor.
+ */
+class PythonThread : public Thread {
 PUBLISHED:
   PythonThread(PyObject *function, PyObject *args,
                const string &name, const string &sync_name);
   virtual ~PythonThread();
 
   BLOCKING PyObject *join();
+
+public:
+  PyObject *get_args() const;
+  void set_args(PyObject *);
+
+  static PyObject *call_python_func(PyObject *function, PyObject *args);
+
+PUBLISHED:
+  MAKE_PROPERTY(args, get_args, set_args);
 
 protected:
   virtual void thread_main();
@@ -62,4 +69,3 @@ private:
 #endif  // HAVE_PYTHON
 
 #endif
-

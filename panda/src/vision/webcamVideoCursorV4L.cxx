@@ -1,20 +1,19 @@
-// Filename: webcamVideoCursorV4L.cxx
-// Created by: rdb (11Jun2010)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file webcamVideoCursorV4L.cxx
+ * @author rdb
+ * @date 2010-06-11
+ */
 
 #include "webcamVideoV4L.h"
 
-#ifdef HAVE_VIDEO4LINUX
+#if defined(HAVE_VIDEO4LINUX) && !defined(CPPPARSER)
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -192,11 +191,9 @@ static JHUFF_TBL ac_chrominance_tbl = {
 
 #endif
 
-////////////////////////////////////////////////////////////////////
-//     Function: WebcamVideoCursorV4L::Constructor
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 WebcamVideoCursorV4L::
 WebcamVideoCursorV4L(WebcamVideoV4L *src) : MovieVideoCursor(src) {
   _size_x = src->_size_x;
@@ -218,8 +215,8 @@ WebcamVideoCursorV4L(WebcamVideoV4L *src) : MovieVideoCursor(src) {
     return;
   }
 
-  // Find the best format in our _pformats vector.
-  // MJPEG is preferred over YUYV, as it's much smaller.
+  // Find the best format in our _pformats vector.  MJPEG is preferred over
+  // YUYV, as it's much smaller.
   _format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   _format.fmt.pix.pixelformat = src->_pformat;
 
@@ -308,7 +305,7 @@ WebcamVideoCursorV4L(WebcamVideoV4L *src) : MovieVideoCursor(src) {
 
   // Set up the mmap buffers
   struct v4l2_buffer buf;
-  for (int i = 0; i < _bufcount; ++i) {
+  for (unsigned int i = 0; i < (unsigned int)_bufcount; ++i) {
     memset(&buf, 0, sizeof buf);
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
@@ -354,11 +351,9 @@ WebcamVideoCursorV4L(WebcamVideoV4L *src) : MovieVideoCursor(src) {
   _ready = true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: WebcamVideoCursorV4L::Destructor
-//       Access: Published, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 WebcamVideoCursorV4L::
 ~WebcamVideoCursorV4L() {
 #ifdef HAVE_JPEG
@@ -372,7 +367,7 @@ WebcamVideoCursorV4L::
     close(_fd);
   }
   if (_buffers) {
-    for (int i = 0; i < _bufcount; ++i) {
+    for (unsigned int i = 0; i < (unsigned int)_bufcount; ++i) {
       munmap(_buffers[i], _buflens[i]);
     }
     free(_buffers);
@@ -382,11 +377,9 @@ WebcamVideoCursorV4L::
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: WebcamVideoCursorV4L::fetch_buffer
-//       Access: Published, Virtual
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 PT(MovieVideoCursor::Buffer) WebcamVideoCursorV4L::
 fetch_buffer() {
   if (!_ready) {
@@ -462,12 +455,12 @@ fetch_buffer() {
     }
 
     // Flip the image vertically
-    for (size_t row = 0; row < _size_y; ++row) {
+    for (int row = 0; row < _size_y; ++row) {
       memcpy(block + (_size_y - row - 1) * new_bpl, newbuf + row * new_bpl, new_bpl);
     }
     free(newbuf);
 
-    // Swap red / blue
+    // Swap red  blue
     unsigned char ex;
     for (size_t i = 0; i < new_bpl * _size_y; i += 3) {
       ex = block[i];

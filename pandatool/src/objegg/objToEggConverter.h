@@ -1,16 +1,15 @@
-// Filename: ObjToEggConverter.h
-// Created by:  drose (07Dec10)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file objToEggConverter.h
+ * @author drose
+ * @date 2010-12-07
+ */
 
 #ifndef OBJTOEGGCONVERTER_H
 #define OBJTOEGGCONVERTER_H
@@ -28,10 +27,9 @@
 #include "pvector.h"
 #include "epvector.h"
 
-////////////////////////////////////////////////////////////////////
-//       Class : ObjToEggConverter
-// Description : Convert an Obj file to egg data.
-////////////////////////////////////////////////////////////////////
+/**
+ * Convert an Obj file to egg data.
+ */
 class ObjToEggConverter : public SomethingToEggConverter {
 public:
   ObjToEggConverter();
@@ -62,6 +60,7 @@ protected:
   bool process_g(vector_string &words);
 
   EggVertex *get_face_vertex(const string &face_reference);
+  void generate_egg_points();
 
   bool process_node(const Filename &filename);
   bool process_line_node(const string &line);
@@ -70,14 +69,14 @@ protected:
   bool process_g_node(vector_string &words);
 
   void generate_points();
-  int add_synth_normal(const LVecBase3 &normal);
+  int add_synth_normal(const LVecBase3d &normal);
 
   // Read from the obj file.
   int _line_number;
-  typedef epvector<LVecBase4> Vec4Table;
-  typedef epvector<LVecBase3> Vec3Table;
-  typedef epvector<LVecBase2> Vec2Table;
-  typedef pmap<LVecBase3, int> UniqueVec3Table;
+  typedef epvector<LVecBase4d> Vec4Table;
+  typedef epvector<LVecBase3d> Vec3Table;
+  typedef epvector<LVecBase2d> Vec2Table;
+  typedef pmap<LVecBase3d, int> UniqueVec3Table;
 
   Vec4Table _v_table;
   Vec3Table _vn_table, _rgb_table;
@@ -85,7 +84,7 @@ protected:
   Vec2Table _xvt_table;
   Vec3Table _synth_vn_table;
   UniqueVec3Table _unique_synth_vn_table;
-  LVecBase2 _ref_plane_res;
+  LVecBase2d _ref_plane_res;
   bool _v4_given, _vt3_given;
   bool _f_given;
 
@@ -108,9 +107,8 @@ protected:
     INLINE bool operator == (const VertexEntry &other) const;
     INLINE bool matches_except_normal(const VertexEntry &other) const;
 
-    // The 1-based vertex, texcoord, and normal index numbers
-    // appearing in the obj file for this vertex.  0 if the index
-    // number is not given.
+    // The 1-based vertex, texcoord, and normal index numbers appearing in the
+    // obj file for this vertex.  0 if the index number is not given.
     int _vi, _vti, _vni;
 
     // The 1-based index number to the synthesized normal, if needed.

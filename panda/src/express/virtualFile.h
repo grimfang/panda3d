@@ -1,16 +1,15 @@
-// Filename: virtualFile.h
-// Created by:  drose (03Aug02)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file virtualFile.h
+ * @author drose
+ * @date 2002-08-03
+ */
 
 #ifndef VIRTUALFILE_H
 #define VIRTUALFILE_H
@@ -29,11 +28,10 @@ class VirtualFileList;
 class VirtualFileSystem;
 
 
-////////////////////////////////////////////////////////////////////
-//       Class : VirtualFile
-// Description : The abstract base class for a file or directory
-//               within the VirtualFileSystem.
-////////////////////////////////////////////////////////////////////
+/**
+ * The abstract base class for a file or directory within the
+ * VirtualFileSystem.
+ */
 class EXPCL_PANDAEXPRESS VirtualFile : public TypedReferenceCount {
 public:
   INLINE VirtualFile();
@@ -58,12 +56,12 @@ PUBLISHED:
   BLOCKING void ls(ostream &out = cout) const;
   BLOCKING void ls_all(ostream &out = cout) const;
 
-  BLOCKING INLINE string read_file(bool auto_unwrap) const;
+  EXTENSION(BLOCKING PyObject *read_file(bool auto_unwrap) const);
   BLOCKING virtual istream *open_read_file(bool auto_unwrap) const;
   BLOCKING virtual void close_read_file(istream *stream) const;
   virtual bool was_read_successful() const;
 
-  BLOCKING INLINE bool write_file(const string &data, bool auto_wrap);
+  EXTENSION(BLOCKING PyObject *write_file(PyObject *data, bool auto_wrap));
   BLOCKING virtual ostream *open_write_file(bool auto_wrap, bool truncate);
   BLOCKING virtual ostream *open_append_file();
   BLOCKING virtual void close_write_file(ostream *stream);
@@ -82,6 +80,9 @@ public:
   virtual bool atomic_compare_and_exchange_contents(string &orig_contents, const string &old_contents, const string &new_contents);
   virtual bool atomic_read_contents(string &contents) const;
 
+  INLINE string read_file(bool auto_unwrap) const;
+  INLINE bool write_file(const string &data, bool auto_wrap);
+
   INLINE void set_original_filename(const Filename &filename);
   bool read_file(string &result, bool auto_unwrap) const;
   virtual bool read_file(pvector<unsigned char> &result, bool auto_unwrap) const;
@@ -91,7 +92,7 @@ public:
   static bool simple_read_file(istream *stream, pvector<unsigned char> &result, size_t max_bytes);
 
 protected:
-  virtual bool scan_local_directory(VirtualFileList *file_list, 
+  virtual bool scan_local_directory(VirtualFileList *file_list,
                                     const ov_set<string> &mount_points) const;
 
 private:

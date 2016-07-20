@@ -1,16 +1,15 @@
-// Filename: textProperties.cxx
-// Created by:  drose (06Apr04)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file textProperties.cxx
+ * @author drose
+ * @date 2004-04-06
+ */
 
 #include "textProperties.h"
 #include "config_text.h"
@@ -19,17 +18,18 @@
 #include "staticTextFont.h"
 #include "bamFile.h"
 #include "fontPool.h"
+#include "colorAttrib.h"
+#include "cullBinAttrib.h"
+#include "transparencyAttrib.h"
 
 PT(TextFont) TextProperties::_default_font;
 bool TextProperties::_loaded_default_font = false;
 
 TypeHandle TextProperties::_type_handle;
 
-////////////////////////////////////////////////////////////////////
-//     Function: TextProperties::Constructor
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 TextProperties::
 TextProperties() {
   _specified = 0;
@@ -53,21 +53,19 @@ TextProperties() {
   _text_scale = 1.0f;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: TextProperties::Copy Constructor
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 TextProperties::
 TextProperties(const TextProperties &copy) {
   (*this) = copy;
+  _text_state = copy._text_state;
+  _shadow_state = copy._shadow_state;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: TextProperties::Copy Assignment Operator
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void TextProperties::
 operator = (const TextProperties &copy) {
   _specified = copy._specified;
@@ -91,13 +89,14 @@ operator = (const TextProperties &copy) {
   _glyph_scale = copy._glyph_scale;
   _glyph_shift = copy._glyph_shift;
   _text_scale = copy._text_scale;
+
+  _text_state.clear();
+  _shadow_state.clear();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: TextProperties::operator ==
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool TextProperties::
 operator == (const TextProperties &other) const {
   if (_specified != other._specified) {
@@ -167,25 +166,19 @@ operator == (const TextProperties &other) const {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: TextProperties::clear
-//       Access: Published
-//  Description: Unsets all properties that have been specified so
-//               far, and resets the TextProperties structure to its
-//               initial empty state.
-////////////////////////////////////////////////////////////////////
+/**
+ * Unsets all properties that have been specified so far, and resets the
+ * TextProperties structure to its initial empty state.
+ */
 void TextProperties::
 clear() {
   (*this) = TextProperties();
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: TextProperties::add_properties
-//       Access: Published
-//  Description: Sets any properties that are explicitly specified in
-//               other on this object.  Leaves other properties
-//               unchanged.
-////////////////////////////////////////////////////////////////////
+/**
+ * Sets any properties that are explicitly specified in other on this object.
+ * Leaves other properties unchanged.
+ */
 void TextProperties::
 add_properties(const TextProperties &other) {
   if (other.has_font()) {
@@ -232,9 +225,9 @@ add_properties(const TextProperties &other) {
     set_tab_width(other.get_tab_width());
   }
 
-  // The glyph scale and shift are a special case: rather than
-  // replacing the previous value, they modify it, so that they apply
-  // cumulatively to nested TextProperties.
+  // The glyph scale and shift are a special case: rather than replacing the
+  // previous value, they modify it, so that they apply cumulatively to nested
+  // TextProperties.
   if (other.has_glyph_shift()) {
     set_glyph_shift(other.get_glyph_shift() * get_glyph_scale() + get_glyph_shift());
   }
@@ -248,11 +241,9 @@ add_properties(const TextProperties &other) {
 }
 
 
-////////////////////////////////////////////////////////////////////
-//     Function: TextProperties::write
-//       Access: Published
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void TextProperties::
 write(ostream &out, int indent_level) const {
   if (!is_any_specified()) {
@@ -296,11 +287,11 @@ write(ostream &out, int indent_level) const {
     case A_left:
       out << "A_left\n";
       break;
-      
+
     case A_right:
       out << "A_right\n";
       break;
-      
+
     case A_center:
       out << "A_center\n";
       break;
@@ -308,11 +299,11 @@ write(ostream &out, int indent_level) const {
     case A_boxed_left:
       out << "A_boxed_left\n";
       break;
-      
+
     case A_boxed_right:
       out << "A_boxed_right\n";
       break;
-      
+
     case A_boxed_center:
       out << "A_boxed_center\n";
       break;
@@ -372,16 +363,64 @@ write(ostream &out, int indent_level) const {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: TextProperties::load_default_font
-//       Access: Private, Static
-//  Description: This function is called once (or never), the first
-//               time someone attempts to render a TextNode using the
-//               default font.  It should attempt to load the default
-//               font, using the compiled-in version if it is
-//               available, or whatever system file may be named in
-//               Configrc.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns a RenderState object suitable for rendering text with these
+ * properties.
+ */
+const RenderState *TextProperties::
+get_text_state() const {
+  if (!_text_state.is_null()) {
+    return _text_state;
+  }
+
+  CPT(RenderState) state = RenderState::make_empty();
+
+  if (has_text_color()) {
+    state = state->add_attrib(ColorAttrib::make_flat(get_text_color()));
+    if (get_text_color()[3] != 1.0) {
+      state = state->add_attrib(TransparencyAttrib::make(TransparencyAttrib::M_alpha));
+    }
+  }
+
+  if (has_bin()) {
+    state = state->add_attrib(CullBinAttrib::make(get_bin(), get_draw_order() + 2));
+  }
+
+  swap(_text_state, state);
+  return _text_state;
+}
+
+/**
+ * Returns a RenderState object suitable for rendering the shadow of this text
+ * with these properties.
+ */
+const RenderState *TextProperties::
+get_shadow_state() const {
+  if (!_shadow_state.is_null()) {
+    return _shadow_state;
+  }
+
+  CPT(RenderState) state = RenderState::make_empty();
+
+  state = state->add_attrib(ColorAttrib::make_flat(get_shadow_color()));
+  if (get_shadow_color()[3] != 1.0) {
+    state = state->add_attrib(TransparencyAttrib::make(TransparencyAttrib::M_alpha));
+  }
+
+  if (has_bin()) {
+    state = state->add_attrib(CullBinAttrib::make(get_bin(), get_draw_order() + 1));
+  }
+
+  swap(_shadow_state, state);
+  return _shadow_state;
+}
+
+/**
+ * This function is called once (or never), the first time someone attempts to
+ * render a TextNode using the default font.  It should attempt to load the
+ * default font, using the compiled-in version if it is available, or whatever
+ * system file may be named in Configrc.
+ */
 void TextProperties::
 load_default_font() {
   _loaded_default_font = true;
@@ -398,26 +437,25 @@ load_default_font() {
 #ifdef COMPILE_IN_DEFAULT_FONT
 #ifdef HAVE_FREETYPE
   // Loading the compiled-in FreeType font is relatively easy.
-  _default_font = new DynamicTextFont((const char *)default_font_data, 
+  _default_font = new DynamicTextFont((const char *)default_font_data,
                                       default_font_size, 0);
   // The compiled-in font seems to confuse FreeType about its winding order.
   ((DynamicTextFont *)_default_font.p())->set_winding_order(DynamicTextFont::WO_left);
 
 #else
-  // The compiled-in Bam font requires creating a BamFile object to
-  // decode it.
+  // The compiled-in Bam font requires creating a BamFile object to decode it.
   string data((const char *)default_font_data, default_font_size);
 
 #ifdef HAVE_ZLIB
   // The font data is stored compressed; decompress it on-the-fly.
   istringstream inz(data);
   IDecompressStream in(&inz, false);
-  
+
 #else
   // The font data is stored uncompressed, so just load it.
   istringstream in(data);
 #endif  // HAVE_ZLIB
-  
+
   BamFile bam_file;
   if (bam_file.open_read(in, "default font stream")) {
     PT(PandaNode) node = bam_file.read_node();
@@ -425,7 +463,7 @@ load_default_font() {
       _default_font = new StaticTextFont(node);
     }
   }
-  
+
 #endif  // HAVE_FREETYPE
 #endif  // COMPILE_IN_DEFAULT_FONT
 }

@@ -1,16 +1,15 @@
-// Filename: geomVertexColumn.h
-// Created by:  drose (06Mar05)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file geomVertexColumn.h
+ * @author drose
+ * @date 2005-03-06
+ */
 
 #ifndef GEOMVERTEXCOLUMN_H
 #define GEOMVERTEXCOLUMN_H
@@ -30,20 +29,19 @@ class DatagramIterator;
 class GeomVertexReader;
 class GeomVertexWriter;
 
-////////////////////////////////////////////////////////////////////
-//       Class : GeomVertexColumn
-// Description : This defines how a single column is interleaved
-//               within a vertex array stored within a Geom.  The
-//               GeomVertexArrayFormat class maintains a list of these
-//               to completely define a particular array structure.
-////////////////////////////////////////////////////////////////////
+/**
+ * This defines how a single column is interleaved within a vertex array
+ * stored within a Geom.  The GeomVertexArrayFormat class maintains a list of
+ * these to completely define a particular array structure.
+ */
 class EXPCL_PANDA_GOBJ GeomVertexColumn : public GeomEnums {
 private:
   INLINE GeomVertexColumn();
 PUBLISHED:
   INLINE GeomVertexColumn(CPT_InternalName name, int num_components,
                           NumericType numeric_type, Contents contents,
-                          int start, int column_alignment = 0);
+                          int start, int column_alignment = 0,
+                          int num_elements = 0, int element_stride = 0);
   INLINE GeomVertexColumn(const GeomVertexColumn &copy);
   void operator = (const GeomVertexColumn &copy);
   INLINE ~GeomVertexColumn();
@@ -107,11 +105,10 @@ private:
   int _total_bytes;
   Packer *_packer;
 
-  // This nested class provides the implementation for packing and
-  // unpacking data in a very general way, but also provides the hooks
-  // for implementing the common, very direct code paths (for
-  // instance, 3-component float32 to LVecBase3f) as quickly as
-  // possible.
+  // This nested class provides the implementation for packing and unpacking
+  // data in a very general way, but also provides the hooks for implementing
+  // the common, very direct code paths (for instance, 3-component float32 to
+  // LVecBase3f) as quickly as possible.
   class Packer : public MemoryBase {
   public:
     virtual ~Packer();
@@ -164,11 +161,10 @@ private:
   };
 
 
-  // This is a specialization on the generic Packer that handles
-  // points, which are special because the fourth component, if not
-  // present in the data, is implicitly 1.0; and if it is present,
-  // then any three-component or smaller return is implicitly divided
-  // by the fourth component.
+  // This is a specialization on the generic Packer that handles points, which
+  // are special because the fourth component, if not present in the data, is
+  // implicitly 1.0; and if it is present, then any three-component or smaller
+  // return is implicitly divided by the fourth component.
   class Packer_point : public Packer {
   public:
     virtual float get_data1f(const unsigned char *pointer);
@@ -197,8 +193,8 @@ private:
   };
 
   // This is similar to Packer_point, in that the fourth component is
-  // implicitly 1.0 if it is not present in the data, but we never
-  // divide by alpha.  It also transforms integer colors to the 0-1 range.
+  // implicitly 1.0 if it is not present in the data, but we never divide by
+  // alpha.  It also transforms integer colors to the 0-1 range.
   class Packer_color : public Packer {
   public:
     virtual float get_data1f(const unsigned char *pointer);
@@ -227,8 +223,8 @@ private:
   };
 
 
-  // These are the specializations on the generic Packer that handle
-  // the direct code paths.
+  // These are the specializations on the generic Packer that handle the
+  // direct code paths.
 
   class Packer_float32_3 : public Packer {
   public:
@@ -346,7 +342,7 @@ private:
     }
   };
 
-  class Packer_nativedouble_3 : public Packer_float64_3 {
+  class Packer_nativedouble_3 FINAL : public Packer_float64_3 {
   public:
     virtual const LVecBase3d &get_data3d(const unsigned char *pointer);
 
@@ -355,7 +351,7 @@ private:
     }
   };
 
-  class Packer_point_nativedouble_2 : public Packer_point_float64_2 {
+  class Packer_point_nativedouble_2 FINAL : public Packer_point_float64_2 {
   public:
     virtual const LVecBase2d &get_data2d(const unsigned char *pointer);
 
@@ -364,7 +360,7 @@ private:
     }
   };
 
-  class Packer_point_nativedouble_3 : public Packer_point_float64_3 {
+  class Packer_point_nativedouble_3 FINAL : public Packer_point_float64_3 {
   public:
     virtual const LVecBase3d &get_data3d(const unsigned char *pointer);
 
@@ -382,7 +378,7 @@ private:
     }
   };
 
-  class Packer_argb_packed : public Packer_color {
+  class Packer_argb_packed FINAL : public Packer_color {
   public:
     virtual const LVecBase4f &get_data4f(const unsigned char *pointer);
     virtual void set_data4f(unsigned char *pointer, const LVecBase4f &value);
@@ -392,7 +388,7 @@ private:
     }
   };
 
-  class Packer_rgba_uint8_4 : public Packer_color {
+  class Packer_rgba_uint8_4 FINAL : public Packer_color {
   public:
     virtual const LVecBase4f &get_data4f(const unsigned char *pointer);
     virtual void set_data4f(unsigned char *pointer, const LVecBase4f &value);
@@ -412,7 +408,7 @@ private:
     }
   };
 
-  class Packer_rgba_nativefloat_4 : public Packer_rgba_float32_4 {
+  class Packer_rgba_nativefloat_4 FINAL : public Packer_rgba_float32_4 {
   public:
     virtual const LVecBase4f &get_data4f(const unsigned char *pointer);
 
@@ -421,7 +417,7 @@ private:
     }
   };
 
-  class Packer_uint16_1 : public Packer {
+  class Packer_uint16_1 FINAL : public Packer {
   public:
     virtual int get_data1i(const unsigned char *pointer);
     virtual void set_data1i(unsigned char *pointer, int value);
@@ -432,6 +428,7 @@ private:
   };
 
   friend class GeomVertexArrayFormat;
+  friend class GeomVertexData;
   friend class GeomVertexReader;
   friend class GeomVertexWriter;
 };

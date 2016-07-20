@@ -1,19 +1,15 @@
-// Filename: check_md5.cxx
-// Created by:
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file check_md5.cxx
+ */
 
 #include "pandabase.h"
-#include "pystub.h"
 #include "hashVal.h"
 #include "filename.h"
 #include "panda_getopt.h"
@@ -25,7 +21,7 @@ pofstream binary_output;
 
 void
 usage() {
-  cerr << 
+  cerr <<
     "\n"
     "Usage:\n\n"
     "check_md5 [-q] [-d] [-b filename] [-i \"input string\"] [file1 file2 ...]\n"
@@ -35,7 +31,7 @@ usage() {
 void
 help() {
   usage();
-  cerr << 
+  cerr <<
     "This program outputs the MD5 hash of one or more files (or of a string\n"
     "passed on the command line with -i).\n\n"
 
@@ -43,7 +39,7 @@ help() {
     "hexadecimal string by default, but with -d, it is presented as four\n"
     "big-endian unsigned 32-bit decimal integers.  Normally the filename\n"
     "of each file is printed along with the hash; -q suppresses this.\n\n"
-    
+
     "To write the 16 bytes (per input file) of the output directly to a\n"
     "binary file, use -b with the name of the file to receive the output.\n";
 }
@@ -60,17 +56,14 @@ output_hash(const string &filename, const HashVal &hash) {
   }
   cout << "\n";
 
-  // Also output to the binary_output file if it is open.  No sweat if
-  // it's not.
+  // Also output to the binary_output file if it is open.  No sweat if it's
+  // not.
   hash.output_binary(binary_output);
 }
-  
+
 
 int
 main(int argc, char **argv) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   extern char *optarg;
   extern int optind;
   const char *optstr = "i:db:qh";

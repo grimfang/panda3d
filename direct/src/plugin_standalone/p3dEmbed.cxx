@@ -1,16 +1,15 @@
-// Filename: p3dEmbed.cxx
-// Created by:  rdb (07Dec09)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file p3dEmbed.cxx
+ * @author rdb
+ * @date 2009-12-07
+ */
 
 #define P3D_FUNCTION_PROTOTYPES
 
@@ -18,42 +17,39 @@
 #include "load_plugin.h"
 #include "find_root_dir.h"
 
-////////////////////////////////////////////////////////////////////
-//     Function: P3DEmbed::Constructor
-//       Access: Public
-//  Description: 
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 P3DEmbed::
 P3DEmbed(bool console_environment) : Panda3DBase(console_environment) {
-  // Since the Panda3DBase constructor no longer assigns _root_dir, we
-  // have to do it here.
+  // Since the Panda3DBase constructor no longer assigns _root_dir, we have to
+  // do it here.
   _root_dir = find_root_dir();
-  
-  // We should leave the arguments intact, just pass them
-  // 1:1 as we've received them.
+
+  // We should leave the arguments intact, just pass them 1:1 as we've
+  // received them.
   _prepend_filename_to_args = false;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: P3DEmbed::run_embedded
-//       Access: Public
-//  Description: Runs with the data embedded in the current
-//               executable, at the specified offset.
-////////////////////////////////////////////////////////////////////
+/**
+ * Runs with the data embedded in the current executable, at the specified
+ * offset.
+ */
 int P3DEmbed::
 run_embedded(streampos read_offset, int argc, char *argv[]) {
-  // Check to see if we've actually got an application embedded.  If
-  // we do, read_offset will have been modified to contain a different
-  // value than the one we compiled in, above.  We test against
-  // read_offset + 1, because any appearances of this exact number
-  // within the binary will be replaced (including this one).
+  // Check to see if we've actually got an application embedded.  If we do,
+  // read_offset will have been modified to contain a different value than the
+  // one we compiled in, above.  We test against read_offset + 1, because any
+  // appearances of this exact number within the binary will be replaced
+  // (including this one).
 
-  // We also have to store this computation in a member variable, to
-  // work around a compiler optimization that might otherwise remove
-  // the + 1 from the test.
+  // We also have to store this computation in a member variable, to work
+  // around a compiler optimization that might otherwise remove the + 1 from
+  // the test.
   _read_offset_check = read_offset + (streampos)1;
   if (_read_offset_check == (streampos)0xFF3D3D01) {
-    cerr << "This program is not intended to be run directly.\nIt is used by pdeploy to construct an embedded Panda3D application.\n";
+    cerr << "This program is not intended to be run directly.\nIt is used "
+            "by pdeploy to construct an embedded Panda3D application.\n";
     return 1;
   }
 
@@ -86,22 +82,30 @@ run_embedded(streampos read_offset, int argc, char *argv[]) {
   string value;
   string root_dir;
   string host_dir;
+  string start_dir;
+
   while (true) {
     if (curchr == EOF) {
       cerr << "Truncated stream\n";
-      return(1);
+      return 1;
 
     } else if (curchr == 0) {
       // Two null bytes in a row means we've reached the end of the data.
       if (havenull) {
         break;
       }
-      
+
       // This means we haven't seen an '=' character yet.
       if (keyword == "") {
         if (curstr != "") {
           cerr << "Ignoring token '" << curstr << "' without value\n";
         }
+
+      } else if (keyword == "start_dir") {
+        // Don't pass this on as a token, since it has slightly different
+        // semantics when used as an HTML token.
+        start_dir = curstr;
+
       } else {
         value.assign(curstr);
         P3D_token token;
@@ -118,6 +122,8 @@ run_embedded(streampos read_offset, int argc, char *argv[]) {
           _got_win_size = true;
         } else if (keyword == "log_basename") {
           _log_basename = value;
+        } else if (keyword == "log_directory") {
+          _log_dirname = value;
         } else if (keyword == "root_dir") {
           root_dir = value;
         } else if (keyword == "host_dir") {
@@ -149,8 +155,8 @@ run_embedded(streampos read_offset, int argc, char *argv[]) {
     curchr = read.get();
   }
 
-  // Update the offset to the current read pointer.
-  // This is where the multifile really starts.
+  // Update the offset to the current read pointer.  This is where the
+  // multifile really starts.
   read_offset = read.tellg();
   read.close();
 
@@ -160,12 +166,19 @@ run_embedded(streampos read_offset, int argc, char *argv[]) {
     root_dir_f.make_absolute(f.get_dirname());
     _root_dir = root_dir_f.to_os_specific();
   }
-  
+
   // Make the host directory absolute
   if (!host_dir.empty()) {
     Filename host_dir_f(host_dir);
     host_dir_f.make_absolute(f.get_dirname());
     _host_dir = host_dir_f.to_os_specific();
+  }
+
+  // Make the start directory absolute
+  if (!start_dir.empty()) {
+    Filename start_dir_f(start_dir);
+    start_dir_f.make_absolute(f.get_dirname());
+    _start_dir = start_dir_f.to_os_specific();
   }
 
   // Initialize the core API by directly assigning all of the function
@@ -210,8 +223,8 @@ run_embedded(streampos read_offset, int argc, char *argv[]) {
   P3D_instance_feed_url_stream_ptr = &P3D_instance_feed_url_stream;
   P3D_instance_handle_event_ptr = &P3D_instance_handle_event;
 
-  // Calling the executable with --prep just prepares the directory
-  // structure, this is usually invoked in the installer.
+  // Calling the executable with --prep just prepares the directory structure,
+  // this is usually invoked in the installer.
   if (argc == 2 && strcmp(argv[1], "--prep") == 0) {
     cerr << "Invoking the prepare step is deprecated, please rebuild the application using a more recent version of pdeploy\n";
     _window_type = P3D_WT_hidden;
@@ -225,21 +238,20 @@ run_embedded(streampos read_offset, int argc, char *argv[]) {
     _tokens.push_back(token);
   }
 
-  // Now call init_plugin() to verify that we got all of the required
-  // function pointers.  This will also call P3D_initialize().
-  if (!init_plugin("", _host_url, _verify_contents, _this_platform, 
+  // Now call init_plugin() to verify that we got all of the required function
+  // pointers.  This will also call P3D_initialize().
+  if (!init_plugin("", _host_url, _verify_contents, _this_platform,
                    _log_dirname, _log_basename, true, _console_environment,
-                   _root_dir, _host_dir, cerr)) {
+                   _root_dir, _host_dir, _start_dir, cerr)) {
     cerr << "Unable to launch core API\n";
     return 1;
   }
-  
+
   // Create a plugin instance and run the program
   P3D_instance *inst = create_instance(f, true, argv, argc, read_offset);
   _instances.insert(inst);
-  
-  run_main_loop();
 
+  run_main_loop();
 
   unload_plugin(cerr);
   return 0;

@@ -1,16 +1,15 @@
-// Filename: thread.h
-// Created by:  cary (16Sep98)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file thread.h
+ * @author cary
+ * @date 1998-09-16
+ */
 
 #ifndef THREAD_H
 #define THREAD_H
@@ -24,11 +23,6 @@
 #include "pnotify.h"
 #include "config_pipeline.h"
 
-#ifdef HAVE_PYTHON
-#undef _POSIX_C_SOURCE
-#include <Python.h>
-#endif  // HAVE_PYTHON
-
 class Mutex;
 class ReMutex;
 class MutexDebug;
@@ -36,18 +30,15 @@ class ConditionVarDebug;
 class ConditionVarFullDebug;
 class AsyncTaskBase;
 
-////////////////////////////////////////////////////////////////////
-//       Class : Thread
-// Description : A thread; that is, a lightweight process.  This is an
-//               abstract base class; to use it, you must subclass
-//               from it and redefine thread_main().
-//
-//               The thread itself will keep a reference count on the
-//               Thread object while it is running; when the thread
-//               returns from its root function, the Thread object
-//               will automatically be destructed if no other pointers
-//               are referencing it.
-////////////////////////////////////////////////////////////////////
+/**
+ * A thread; that is, a lightweight process.  This is an abstract base class;
+ * to use it, you must subclass from it and redefine thread_main().
+ *
+ * The thread itself will keep a reference count on the Thread object while it
+ * is running; when the thread returns from its root function, the Thread
+ * object will automatically be destructed if no other pointers are
+ * referencing it.
+ */
 class EXPCL_PANDA_PIPELINE Thread : public TypedReferenceCount, public Namable {
 protected:
   Thread(const string &name, const string &sync_name);
@@ -68,6 +59,7 @@ PUBLISHED:
   INLINE const string &get_sync_name() const;
 
   INLINE int get_pstats_index() const;
+  INLINE int get_python_index() const;
   INLINE string get_unique_id() const;
 
   INLINE int get_pipeline_stage() const;
@@ -97,14 +89,20 @@ PUBLISHED:
   BLOCKING INLINE void join();
   INLINE void preempt();
 
-#ifdef HAVE_PYTHON
-  void set_python_data(PyObject *python_data);
-  PyObject *get_python_data() const;
-#endif
-
   INLINE AsyncTaskBase *get_current_task() const;
 
+  INLINE void set_python_index(int index);
+
   INLINE static void prepare_for_exit();
+
+  MAKE_PROPERTY(sync_name, get_sync_name);
+  MAKE_PROPERTY(pstats_index, get_pstats_index);
+  MAKE_PROPERTY(python_index, get_python_index);
+  MAKE_PROPERTY(unique_id, get_unique_id);
+  MAKE_PROPERTY(pipeline_stage, get_pipeline_stage, set_pipeline_stage);
+  MAKE_PROPERTY(started, is_started);
+  MAKE_PROPERTY(joinable, is_joinable);
+  MAKE_PROPERTY(current_task, get_current_task);
 
 public:
   // This class allows integration with PStats, particularly in the
@@ -119,12 +117,6 @@ public:
   INLINE void set_pstats_index(int pstats_index);
   INLINE void set_pstats_callback(PStatsCallback *pstats_callback);
   INLINE PStatsCallback *get_pstats_callback() const;
-
-#ifdef HAVE_PYTHON
-  // Integration with Python.
-  PyObject *call_python_func(PyObject *function, PyObject *args);
-  void handle_python_exception();
-#endif  // HAVE_PYTHON
 
 private:
   static void init_main_thread();
@@ -142,9 +134,7 @@ private:
   bool _joinable;
   AsyncTaskBase *_current_task;
 
-#ifdef HAVE_PYTHON
-  PyObject *_python_data;
-#endif
+  int _python_index;
 
 #ifdef DEBUG_THREADS
   MutexDebug *_blocked_on_mutex;

@@ -1,16 +1,15 @@
-// Filename: NxPhysics.h
-// Created by:  enn0x (02Sep09)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file NxPhysics.h
+ * @author enn0x
+ * @date 2009-09-02
+ */
 
 // This file, and all the other files in this directory, aren't
 // intended to be compiled--they're just parsed by CPPParser (and
@@ -32,6 +31,7 @@ class NxCapsuleForceFieldShapeDesc;
 class NxCapsuleShape;
 class NxCapsuleShapeDesc;
 class NxCCDSkeleton;
+class NxContactStreamIterator;
 class NxConvexMesh;
 class NxConvexMeshDesc;
 class NxConvexForceFieldShape;
@@ -121,11 +121,16 @@ class NxSoftBodyDesc;
 class NxSoftBodyMesh;
 class NxSoftBodyMeshDesc;
 
-enum NxSDKCreateError;
-enum NxAssertResponse;
-enum NxErrorCode;
-enum NxTriggerFlag;
-enum NxHeightFieldAxis;
+enum NxAssertResponse {
+  NX_AR_CONTINUE,
+  NX_AR_IGNORE,
+  NX_AR_BREAKPOINT
+};
+
+enum NxControllerType {
+  NX_CONTROLLER_CAPSULE,
+  NX_CONTROLLER_FORCE_DWORD = 0x7fffffff
+};
 
 template<class T> class NxUserEntityReport;
 

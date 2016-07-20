@@ -1,16 +1,15 @@
-// Filename: rocketRenderInterface.h
-// Created by:  rdb (04Nov11)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file rocketRenderInterface.h
+ * @author rdb
+ * @date 2011-11-04
+ */
 
 #ifndef ROCKET_RENDER_INTERFACE_H
 #define ROCKET_RENDER_INTERFACE_H
@@ -24,11 +23,9 @@
 
 #include <Rocket/Core/RenderInterface.h>
 
-////////////////////////////////////////////////////////////////////
-//       Class : RocketRenderInterface
-// Description : Class that provides the main render interface for
-//               libRocket integration.
-////////////////////////////////////////////////////////////////////
+/**
+ * Class that provides the main render interface for libRocket integration.
+ */
 class RocketRenderInterface : public Rocket::Core::RenderInterface {
 public:
   void render(Rocket::Core::Context* context, CullTraverser *trav);
@@ -39,7 +36,9 @@ protected:
     CPT(RenderState) _state;
   };
 
-  PT(Geom) make_geom(Rocket::Core::Vertex* vertices, int num_vertices, int* indices, int num_indices, GeomEnums::UsageHint uh);
+  PT(Geom) make_geom(Rocket::Core::Vertex* vertices,
+                     int num_vertices, int* indices, int num_indices,
+                     GeomEnums::UsageHint uh, const LVecBase2 &tex_scale);
   void render_geom(const Geom* geom, const RenderState* state, const Rocket::Core::Vector2f& translation);
 
   void RenderGeometry(Rocket::Core::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rocket::Core::TextureHandle texture, const Rocket::Core::Vector2f& translation);
@@ -70,6 +69,7 @@ private:
   CPT(TransformState) _net_transform;
   CPT(RenderState) _net_state;
   Rocket::Core::Vector2i _dimensions;
+
 };
 
 #endif

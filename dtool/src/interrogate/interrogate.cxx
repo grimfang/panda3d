@@ -1,16 +1,15 @@
-// Filename: interrogate.cxx
-// Created by:  drose (31Jul00)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file interrogate.cxx
+ * @author drose
+ * @date 2000-07-31
+ */
 
 #include "interrogate.h"
 #include "interrogateBuilder.h"
@@ -20,7 +19,6 @@
 #include "pnotify.h"
 #include "panda_getopt_long.h"
 #include "preprocess_argv.h"
-#include "pystub.h"
 #include <time.h>
 
 CPPParser parser;
@@ -79,6 +77,7 @@ enum CommandOptions {
   CO_promiscuous,
   CO_spam,
   CO_noangles,
+  CO_nomangle,
   CO_help,
 };
 
@@ -106,6 +105,7 @@ static struct option long_options[] = {
   { "promiscuous", no_argument, NULL, CO_promiscuous },
   { "spam", no_argument, NULL, CO_spam },
   { "noangles", no_argument, NULL, CO_noangles },
+  { "nomangle", no_argument, NULL, CO_nomangle },
   { "help", no_argument, NULL, CO_help },
   { NULL }
 };
@@ -270,10 +270,6 @@ void show_help() {
     << "        function wrappers already, from some external source.  This is most\n"
     << "        useful in conjunction with -true-names.\n\n"
 
-    << "  -longlong typename\n"
-    << "        Specify the name of the 64-bit integer type for the current compiler.\n"
-    << "        By default, this is \"long long\".\n\n"
-
     << "  -promiscuous\n"
     << "        Export *all* public symbols, functions, and classes seen, even those\n"
     << "        not explicitly marked to be published.\n\n"
@@ -284,7 +280,10 @@ void show_help() {
 
     << "  -noangles\n"
     << "        Treat #include <file> the same as #include \"file\".  This means -I\n"
-    << "        and -S are equivalent.\n\n";
+    << "        and -S are equivalent.\n\n"
+
+    << "  -nomangle\n"
+    << "        Do not generate camelCase equivalents of functions.\n\n";
 }
 
 // handle commandline -D options
@@ -300,15 +299,12 @@ predefine_macro(CPPParser& parser, const string& inoption) {
     macro_name = inoption;
   }
 
-  CPPManifest *macro = new CPPManifest(macro_name + " " + macro_def);
+  CPPManifest *macro = new CPPManifest(macro_name, macro_def);
   parser._manifests[macro->_name] = macro;
 }
 
 int
 main(int argc, char **argv) {
-  // A call to pystub() to force libpystub.so to be linked in.
-  pystub();
-
   preprocess_argv(argc, argv);
   string command_line;
   int i;
@@ -431,6 +427,7 @@ main(int argc, char **argv) {
       break;
 
     case CO_longlong:
+      cerr << "Warning: ignoring deprecated -longlong option.\n";
       cpp_longlong_keyword = optarg;
       break;
 
@@ -444,6 +441,10 @@ main(int argc, char **argv) {
 
     case CO_noangles:
       parser._noangles = true;
+      break;
+
+    case CO_nomangle:
+      mangle_names = false;
       break;
 
     case 'h':
@@ -473,15 +474,13 @@ main(int argc, char **argv) {
     }
   }
 
-//  if(!output_code_filename.empty())
-//  {
-//    output_include_filename = output_code_filename.get_fullpath_wo_extension() +".h";
-//    printf(" Include File Will be Set to %s \n",output_include_filename.c_str());
-//  }
+// if(!output_code_filename.empty()) { output_include_filename =
+// output_code_filename.get_fullpath_wo_extension() +".h"; printf(" Include
+// File Will be Set to %s \n",output_include_filename.c_str()); }
 
   output_code_filename.set_text();
   output_data_filename.set_text();
-//  output_include_filename.set_text();
+// output_include_filename.set_text();
   output_data_basename = output_data_filename.get_basename();
 
   if (output_function_names && true_wrapper_names) {
@@ -492,14 +491,20 @@ main(int argc, char **argv) {
     exit(1);
   }
 
-  if (!build_c_wrappers && !build_python_wrappers && 
+  if (!build_c_wrappers && !build_python_wrappers &&
       !build_python_obj_wrappers &&!build_python_native) {
     build_c_wrappers = true;
   }
 
-  // Get all of the .h files.
-  for (i = 1; i < argc; ++i) 
-  {
+  // Add all of the .h files we are explicitly including to the parser.
+  for (i = 1; i < argc; ++i) {
+    Filename filename = Filename::from_os_specific(argv[i]);
+    filename.make_absolute();
+    parser._explicit_files.insert(filename);
+  }
+
+  // Now go through them again and feed them into the C++ parser.
+  for (i = 1; i < argc; ++i) {
     Filename filename = Filename::from_os_specific(argv[i]);
     if (!parser.parse_file(filename)) {
       cerr << "Error parsing file: '" << argv[i] << "'\n";
@@ -508,14 +513,13 @@ main(int argc, char **argv) {
     builder.add_source_file(filename);
   }
 
-  // Now that we've parsed all the source code, change the way things
-  // are output from now on so we can compile our generated code using
-  // VC++.  Sheesh.
+  // Now that we've parsed all the source code, change the way things are
+  // output from now on so we can compile our generated code using VC++.
+  // Sheesh.
 
-  // Actually, don't do this any more, since it bitches some of the
-  // logic (particularly with locating alt names), and it shouldn't be
-  // necessary with modern VC++.
-  //  cppparser_output_class_keyword = false;
+  // Actually, don't do this any more, since it bitches some of the logic
+  // (particularly with locating alt names), and it shouldn't be necessary
+  // with modern VC++. cppparser_output_class_keyword = false;
 
   // Now look for the .N files.
   for (i = 1; i < argc; ++i) {
@@ -531,17 +535,17 @@ main(int argc, char **argv) {
 
   builder.build();
 
-  // Make up a file identifier.  This is just some bogus number that
-  // should be the same in both the compiled-in code and in the
-  // database, so we can check synchronicity at load time.
+  // Make up a file identifier.  This is just some bogus number that should be
+  // the same in both the compiled-in code and in the database, so we can
+  // check synchronicity at load time.
   int file_identifier = time((time_t *)NULL);
   InterrogateModuleDef *def = builder.make_module_def(file_identifier);
-    
+
   pofstream * the_output_include = NULL;
   pofstream output_include;
-  
 
-  if (1==2 && !output_include_filename.empty()) 
+
+  if (1==2 && !output_include_filename.empty())
   {
     output_include_filename.open_write(output_include);
 
@@ -550,17 +554,17 @@ main(int argc, char **argv) {
 
     output_include
       << "/*\n"
-      << " * This file generated by:\n"
+      << " * This file was generated by:\n"
       << " * " << command_line << "\n"
       << " *\n"
       << " */\n\n";
 
 
-    if (output_include.fail()) 
+    if (output_include.fail())
     {
       nout << "Unable to write to " << output_include_filename << "\n";
       exit(-1);
-    } 
+    }
     the_output_include = &output_include;
   }
 
@@ -572,7 +576,7 @@ main(int argc, char **argv) {
 
     output_code
       << "/*\n"
-      << " * This file generated by:\n"
+      << " * This file was generated by:\n"
       << " * " << command_line << "\n"
       << " *\n"
       << " */\n\n";
@@ -599,7 +603,7 @@ main(int argc, char **argv) {
     pofstream output_data;
     output_data_filename.open_write(output_data);
 
-    if (output_data.fail()) 
+    if (output_data.fail())
     {
       nout << "Unable to write to " << output_data_filename << "\n";
     } else {

@@ -1,16 +1,15 @@
-// Filename: glGeomMunger_src.h
-// Created by:  drose (10Mar05)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file glGeomMunger_src.h
+ * @author drose
+ * @date 2005-03-10
+ */
 
 #include "pandabase.h"
 #include "standardMunger.h"
@@ -23,12 +22,11 @@
 
 class CLP(GeomContext);
 
-////////////////////////////////////////////////////////////////////
-//       Class : GLGeomMunger
-// Description : This specialization on GeomMunger finesses vertices
-//               for OpenGL rendering.  In particular, it makes sure
-//               colors aren't stored in DirectX's packed_argb format.
-////////////////////////////////////////////////////////////////////
+/**
+ * This specialization on GeomMunger finesses vertices for OpenGL rendering.
+ * In particular, it makes sure colors aren't stored in DirectX's packed_argb
+ * format.
+ */
 class EXPCL_GL CLP(GeomMunger) : public StandardMunger, public WeakPointerCallback {
 public:
   CLP(GeomMunger)(GraphicsStateGuardian *gsg, const RenderState *state);
@@ -41,12 +39,6 @@ protected:
   virtual CPT(GeomVertexFormat) munge_format_impl(const GeomVertexFormat *orig,
                                                   const GeomVertexAnimationSpec &animation);
   virtual CPT(GeomVertexFormat) premunge_format_impl(const GeomVertexFormat *orig);
-
-#ifdef OPENGLES
-  virtual void munge_geom_impl(CPT(Geom) &geom, CPT(GeomVertexData) &data,
-                               Thread *current_thread);
-  virtual void premunge_geom_impl(CPT(Geom) &geom, CPT(GeomVertexData) &data);
-#endif
 
   virtual int compare_to_impl(const GeomMunger *other) const;
   virtual int geom_compare_to_impl(const GeomMunger *other) const;
@@ -85,4 +77,3 @@ private:
 };
 
 #include "glGeomMunger_src.I"
-

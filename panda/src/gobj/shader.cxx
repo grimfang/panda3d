@@ -1,23 +1,27 @@
-// Filename: shader.cxx
-// Created by: jyelon (01Sep05)
-// Updated by: fperazzi, PandaSE(06Apr10)
-// Updated by: fperazzi, PandaSE(29Apr10) (added SAT_sampler2dArray)
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file shader.cxx
+ * @author jyelon
+ * @date 2005-09-01
+ * @author fperazzi, PandaSE
+ * @date 2010-04-06
+ * @author fperazzi, PandaSE
+ * @date 2010-04-29
+ */
 
 #include "pandabase.h"
 #include "shader.h"
 #include "preparedGraphicsObjects.h"
 #include "virtualFileSystem.h"
 #include "config_util.h"
+#include "bamCache.h"
+#include "string_utils.h"
 
 #ifdef HAVE_CG
 #include <Cg/cg.h>
@@ -28,18 +32,15 @@ Shader::ShaderTable Shader::_load_table;
 Shader::ShaderTable Shader::_make_table;
 Shader::ShaderCaps Shader::_default_caps;
 int Shader::_shaders_generated;
-ShaderUtilization Shader::_shader_utilization = SUT_unspecified;
 
 #ifdef HAVE_CG
 CGcontext Shader::_cg_context = 0;
 #endif
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_report_error
-//       Access: Public
-//  Description: Generate an error message including a description
-//               of the specified parameter.
-////////////////////////////////////////////////////////////////////
+/**
+ * Generate an error message including a description of the specified
+ * parameter.
+ */
 void Shader::
 cp_report_error(ShaderArgInfo &p, const string &msg) {
 
@@ -82,12 +83,14 @@ cp_report_error(ShaderArgInfo &p, const string &msg) {
   case SAT_mat4x2:    tstr = "mat4x2 "; break;
   case SAT_mat4x3:    tstr = "mat4x3 "; break;
   case SAT_mat4x4:    tstr = "mat4x4 "; break;
-  case SAT_sampler1d: tstr = "sampler1d "; break;
-  case SAT_sampler2d: tstr = "sampler2d "; break;
-  case SAT_sampler3d: tstr = "sampler3d "; break;
-  case SAT_sampler2dArray: tstr = "sampler2dArray "; break;
-  case SAT_samplercube:    tstr = "samplercube "; break;
-  default:                 tstr = "unknown "; break;
+  case SAT_sampler1d: tstr = "sampler1D "; break;
+  case SAT_sampler2d: tstr = "sampler2D "; break;
+  case SAT_sampler3d: tstr = "sampler3D "; break;
+  case SAT_sampler2d_array:   tstr = "sampler2DArray "; break;
+  case SAT_sampler_cube:      tstr = "samplerCUBE "; break;
+  case SAT_sampler_buffer:    tstr = "samplerBUF "; break;
+  case SAT_sampler_cube_array:tstr = "samplerCUBEARRAY "; break;
+  default:                    tstr = "unknown "; break;
   }
 
   string cstr = "invalid";
@@ -105,13 +108,10 @@ cp_report_error(ShaderArgInfo &p, const string &msg) {
     p._id._name << ": " << msg << "\n";
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_errchk_parameter_words
-//       Access: Public, Static
-//  Description: Make sure the provided parameter contains
-//               the specified number of words.  If not, print
-//               error message and return false.
-////////////////////////////////////////////////////////////////////
+/**
+ * Make sure the provided parameter contains the specified number of words.
+ * If not, print error message and return false.
+ */
 bool Shader::
 cp_errchk_parameter_words(ShaderArgInfo &p, int len)
 {
@@ -124,13 +124,10 @@ cp_errchk_parameter_words(ShaderArgInfo &p, int len)
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_errchk_parameter_in
-//       Access: Public, Static
-//  Description: Make sure the provided parameter has the
-//               'in' direction.  If not, print
-//               error message and return false.
-////////////////////////////////////////////////////////////////////
+/**
+ * Make sure the provided parameter has the 'in' direction.  If not, print
+ * error message and return false.
+ */
 bool Shader::
 cp_errchk_parameter_in(ShaderArgInfo &p)
 {
@@ -141,13 +138,10 @@ cp_errchk_parameter_in(ShaderArgInfo &p)
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_errchk_parameter_varying
-//       Access: Public, Static
-//  Description: Make sure the provided parameter has the
-//               correct variance.  If not, print
-//               error message and return false.
-////////////////////////////////////////////////////////////////////
+/**
+ * Make sure the provided parameter has the correct variance.  If not, print
+ * error message and return false.
+ */
 bool Shader::
 cp_errchk_parameter_varying(ShaderArgInfo &p)
 {
@@ -158,13 +152,10 @@ cp_errchk_parameter_varying(ShaderArgInfo &p)
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_errchk_parameter_uniform
-//       Access: Public, Static
-//  Description: Make sure the provided parameter has the
-//               correct variance.  If not, print
-//               error message and return false.
-////////////////////////////////////////////////////////////////////
+/**
+ * Make sure the provided parameter has the correct variance.  If not, print
+ * error message and return false.
+ */
 bool Shader::
 cp_errchk_parameter_uniform(ShaderArgInfo &p)
 {
@@ -175,13 +166,10 @@ cp_errchk_parameter_uniform(ShaderArgInfo &p)
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_errchk_parameter_float
-//       Access: Public, Static
-//  Description: Make sure the provided parameter has
-//               a floating point type.  If not, print
-//               error message and return false.
-////////////////////////////////////////////////////////////////////
+/**
+ * Make sure the provided parameter has a floating point type.  If not, print
+ * error message and return false.
+ */
 bool Shader::
 cp_errchk_parameter_float(ShaderArgInfo &p, int lo, int hi)
 {
@@ -203,11 +191,9 @@ cp_errchk_parameter_float(ShaderArgInfo &p, int lo, int hi)
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_errchk_parameter_ptr
-//       Access: Public, Static
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Shader::
 cp_errchk_parameter_ptr(ShaderArgInfo &p) {
   switch (p._class) {
@@ -231,32 +217,29 @@ cp_errchk_parameter_ptr(ShaderArgInfo &p) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_errchk_parameter_sampler
-//       Access: Public, Static
-//  Description: Make sure the provided parameter has
-//               a texture type.  If not, print
-//               error message and return false.
-////////////////////////////////////////////////////////////////////
+/**
+ * Make sure the provided parameter has a texture type.  If not, print error
+ * message and return false.
+ */
 bool Shader::
 cp_errchk_parameter_sampler(ShaderArgInfo &p)
 {
   if ((p._type!=SAT_sampler1d)&&
       (p._type!=SAT_sampler2d)&&
       (p._type!=SAT_sampler3d)&&
-      (p._type!=SAT_sampler2dArray)&&
-      (p._type!=SAT_samplercube)) {
+      (p._type!=SAT_sampler2d_array)&&
+      (p._type!=SAT_sampler_cube)&&
+      (p._type!=SAT_sampler_buffer)&&
+      (p._type!=SAT_sampler_cube_array)) {
     cp_report_error(p, "parameter should have a 'sampler' type");
     return false;
   }
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_parse_eol
-//       Access: Public
-//  Description: Make sure the next thing on the word list is EOL
-////////////////////////////////////////////////////////////////////
+/**
+ * Make sure the next thing on the word list is EOL
+ */
 bool Shader::
 cp_parse_eol(ShaderArgInfo &p, vector_string &words, int &next) {
   if (words[next] != "") {
@@ -266,11 +249,9 @@ cp_parse_eol(ShaderArgInfo &p, vector_string &words, int &next) {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_parse_delimiter
-//       Access: Public
-//  Description: Pop a delimiter ('to' or 'rel') from the word list.
-////////////////////////////////////////////////////////////////////
+/**
+ * Pop a delimiter ('to' or 'rel') from the word list.
+ */
 bool Shader::
 cp_parse_delimiter(ShaderArgInfo &p, vector_string &words, int &next) {
   if ((words[next] != "to")&&(words[next] != "rel")) {
@@ -281,12 +262,10 @@ cp_parse_delimiter(ShaderArgInfo &p, vector_string &words, int &next) {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_parse_non_delimiter
-//       Access: Public
-//  Description: Pop a non-delimiter word from the word list.
-//               Delimiters are 'to' and 'rel.'
-////////////////////////////////////////////////////////////////////
+/**
+ * Pop a non-delimiter word from the word list.  Delimiters are 'to' and
+ * 'rel.'
+ */
 string Shader::
 cp_parse_non_delimiter(vector_string &words, int &next) {
   const string &nword = words[next];
@@ -297,12 +276,10 @@ cp_parse_non_delimiter(vector_string &words, int &next) {
   return nword;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_parse_coord_sys
-//       Access: Public
-//  Description: Convert a single-word coordinate system name into
-//               a PART/ARG of a ShaderMatSpec.
-////////////////////////////////////////////////////////////////////
+/**
+ * Convert a single-word coordinate system name into a PART/ARG of a
+ * ShaderMatSpec.
+ */
 bool Shader::
 cp_parse_coord_sys(ShaderArgInfo &p,
                    vector_string &pieces, int &next,
@@ -386,13 +363,10 @@ cp_parse_coord_sys(ShaderArgInfo &p,
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_dependency
-//       Access: Public
-//  Description: Given ShaderMatInput, returns an indication of what
-//               part or parts of the state_and_transform the
-//               ShaderMatInput depends upon.
-////////////////////////////////////////////////////////////////////
+/**
+ * Given ShaderMatInput, returns an indication of what part or parts of the
+ * state_and_transform the ShaderMatInput depends upon.
+ */
 int Shader::
 cp_dependency(ShaderMatInput inp) {
 
@@ -401,7 +375,7 @@ cp_dependency(ShaderMatInput inp) {
   if (inp == SMO_INVALID) {
     return SSD_NONE;
   }
-  if (inp == SMO_attr_material) {
+  if (inp == SMO_attr_material || inp == SMO_attr_material2) {
     dep |= SSD_material;
   }
   if (inp == SMO_attr_color) {
@@ -416,7 +390,20 @@ cp_dependency(ShaderMatInput inp) {
   if ((inp == SMO_model_to_view) ||
       (inp == SMO_view_to_model) ||
       (inp == SMO_model_to_apiview) ||
-      (inp == SMO_apiview_to_model)) {
+      (inp == SMO_apiview_to_model) ||
+      (inp == SMO_view_to_world) ||
+      (inp == SMO_world_to_view) ||
+      (inp == SMO_view_x_to_view) ||
+      (inp == SMO_view_to_view_x) ||
+      (inp == SMO_apiview_x_to_view) ||
+      (inp == SMO_view_to_apiview_x) ||
+      (inp == SMO_clip_x_to_view) ||
+      (inp == SMO_view_to_clip_x) ||
+      (inp == SMO_apiclip_x_to_view) ||
+      (inp == SMO_view_to_apiclip_x) ||
+      (inp == SMO_dlight_x) ||
+      (inp == SMO_plight_x) ||
+      (inp == SMO_slight_x)) {
     dep |= SSD_transform;
   }
   if ((inp == SMO_texpad_x) ||
@@ -438,10 +425,32 @@ cp_dependency(ShaderMatInput inp) {
       (inp == SMO_apiclip_x_to_view) ||
       (inp == SMO_view_to_apiclip_x)) {
     dep |= SSD_shaderinputs;
+
+    if ((inp == SMO_alight_x) ||
+        (inp == SMO_dlight_x) ||
+        (inp == SMO_plight_x) ||
+        (inp == SMO_slight_x) ||
+        (inp == SMO_satten_x) ||
+        (inp == SMO_vec_constant_x_attrib) ||
+        (inp == SMO_view_x_to_view) ||
+        (inp == SMO_view_to_view_x) ||
+        (inp == SMO_apiview_x_to_view) ||
+        (inp == SMO_view_to_apiview_x) ||
+        (inp == SMO_clip_x_to_view) ||
+        (inp == SMO_view_to_clip_x) ||
+        (inp == SMO_apiclip_x_to_view) ||
+        (inp == SMO_view_to_apiclip_x)) {
+      // We can't track changes to these yet, so we have to assume that they
+      // are modified every frame.
+      dep |= SSD_frame;
+    }
   }
   if ((inp == SMO_light_ambient) ||
       (inp == SMO_light_source_i_attrib)) {
     dep |= SSD_light;
+    if (inp == SMO_light_source_i_attrib) {
+      dep |= SSD_transform;
+    }
   }
   if ((inp == SMO_light_product_i_ambient) ||
       (inp == SMO_light_product_i_diffuse) ||
@@ -452,19 +461,37 @@ cp_dependency(ShaderMatInput inp) {
       (inp == SMO_apiview_clipplane_i)) {
     dep |= SSD_clip_planes;
   }
+  if (inp == SMO_texmat_i || inp == SMO_inv_texmat_i) {
+    dep |= SSD_tex_matrix;
+  }
+  if ((inp == SMO_window_size) ||
+      (inp == SMO_pixel_size) ||
+      (inp == SMO_frame_number) ||
+      (inp == SMO_frame_time) ||
+      (inp == SMO_frame_delta)) {
+    dep |= SSD_frame;
+  }
+  if ((inp == SMO_clip_to_view) ||
+      (inp == SMO_view_to_clip) ||
+      (inp == SMO_apiclip_to_view) ||
+      (inp == SMO_view_to_apiclip) ||
+      (inp == SMO_apiview_to_apiclip) ||
+      (inp == SMO_apiclip_to_apiview)) {
+    dep |= SSD_projection;
+  }
+  if (inp == SMO_tex_is_alpha_i) {
+    dep |= SSD_texture | SSD_frame;
+  }
 
   return dep;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cp_optimize_mat_spec
-//       Access: Public
-//  Description: Analyzes a ShaderMatSpec and decides what it should
-//               use its cache for.  It can cache the results of any
-//               one opcode, or, it can cache the entire result.  This
-//               routine needs to be smart enough to know which
-//               data items can be correctly cached, and which cannot.
-////////////////////////////////////////////////////////////////////
+/**
+ * Analyzes a ShaderMatSpec and decides what it should use its cache for.  It
+ * can cache the results of any one opcode, or, it can cache the entire
+ * result.  This routine needs to be smart enough to know which data items can
+ * be correctly cached, and which cannot.
+ */
 void Shader::
 cp_optimize_mat_spec(ShaderMatSpec &spec) {
 
@@ -531,11 +558,9 @@ cp_optimize_mat_spec(ShaderMatSpec &spec) {
 }
 
 #ifdef HAVE_CG
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_recurse_parameters
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Shader::
 cg_recurse_parameters(CGparameter parameter, const ShaderType &type,
                       bool &success) {
@@ -553,6 +578,7 @@ cg_recurse_parameters(CGparameter parameter, const ShaderType &type,
       ShaderArgClass     arg_subclass = arg_class;
 
       CGenum vbl = cgGetParameterVariability(parameter);
+      CGtype base_type = cgGetParameterBaseType(parameter);
 
       if ((vbl==CG_VARYING)||(vbl==CG_UNIFORM)) {
         switch (cgGetParameterType(parameter)) {
@@ -567,16 +593,28 @@ cg_recurse_parameters(CGparameter parameter, const ShaderType &type,
 
             arg_dim[0]  = cgGetArraySize(parameter, 0);
 
+            // Fall through
           default: {
             arg_dim[1] = cgGetParameterRows(parameter);
             arg_dim[2] = cgGetParameterColumns(parameter);
 
-            ShaderArgId id;
-            id._name = cgGetParameterName(parameter);
-            id._type  = type;
-            id._seqno = -1;
-            success &= compile_parameter(id, arg_class, arg_subclass, arg_type,
-                arg_dir, (vbl == CG_VARYING), arg_dim, shader_cat.get_safe_ptr()); break;
+            ShaderArgInfo p;
+            p._id._name   = cgGetParameterName(parameter);
+            p._id._type   = type;
+            p._id._seqno  = -1;
+            p._class      = arg_class;
+            p._subclass   = arg_subclass;
+            p._type       = arg_type;
+            p._direction  = arg_dir;
+            p._varying    = (vbl == CG_VARYING);
+            p._integer    = (base_type == CG_UINT || base_type == CG_INT ||
+                             base_type == CG_ULONG || base_type == CG_LONG ||
+                             base_type == CG_USHORT || base_type == CG_SHORT ||
+                             base_type == CG_UCHAR || base_type == CG_CHAR);
+            p._cat        = shader_cat.get_safe_ptr();
+
+            success &= compile_parameter(p, arg_dim);
+            break;
           }
         }
       }
@@ -589,41 +627,20 @@ cg_recurse_parameters(CGparameter parameter, const ShaderType &type,
 }
 #endif  // HAVE_CG
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::compile_parameter
-//       Access: Public
-//  Description: Analyzes a parameter and decides how to
-//               bind the parameter to some part of panda's
-//               internal state.  Updates one of the bind
-//               arrays to cause the binding to occur.
-//
-//               If there is an error, this routine will append
-//               an error message onto the error messages.
-////////////////////////////////////////////////////////////////////
+/**
+ * Analyzes a parameter and decides how to bind the parameter to some part of
+ * panda's internal state.  Updates one of the bind arrays to cause the
+ * binding to occur.
+ *
+ * If there is an error, this routine will append an error message onto the
+ * error messages.
+ */
 bool Shader::
-compile_parameter(const ShaderArgId        &arg_id,
-                  const ShaderArgClass     &arg_class,
-                  const ShaderArgClass     &arg_subclass,
-                  const ShaderArgType      &arg_type,
-                  const ShaderArgDir       &arg_direction,
-                  bool                      arg_varying,
-                  int                      *arg_dim,
-                  NotifyCategory           *arg_cat)
-{
-  ShaderArgInfo p;
-  p._id         = arg_id;
-  p._class      = arg_class;
-  p._subclass   = arg_subclass;
-  p._type       = arg_type;
-  p._direction  = arg_direction;
-  p._varying    = arg_varying;
-  p._cat        = arg_cat;
-
+compile_parameter(ShaderArgInfo &p, int *arg_dim) {
   if (p._id._name.size() == 0) return true;
   if (p._id._name[0] == '$') return true;
 
-  // It could be inside a struct, strip off
-  // everything before the last dot.
+  // It could be inside a struct, strip off everything before the last dot.
   size_t loc = p._id._name.find_last_of('.');
 
   string basename (p._id._name);
@@ -650,9 +667,9 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderVarSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._append_uv = -1;
-    bind._integer = false;
+    bind._integer = p._integer;
 
     if (pieces.size() == 2) {
       if (pieces[1] == "position") {
@@ -685,6 +702,24 @@ compile_parameter(const ShaderArgId        &arg_id,
         _var_spec.push_back(bind);
         return true;
       }
+    } else if (pieces.size() == 3) {
+      if (pieces[1] == "transform") {
+        if (pieces[2] == "blend") {
+          bind._name = InternalName::get_transform_blend();
+          _var_spec.push_back(bind);
+          return true;
+        }
+        if (pieces[2] == "index") {
+          bind._name = InternalName::get_transform_index();
+          _var_spec.push_back(bind);
+          return true;
+        }
+        if (pieces[2] == "weight") {
+          bind._name = InternalName::get_transform_weight();
+          _var_spec.push_back(bind);
+          return true;
+        }
+      }
     }
 
     bind._name = InternalName::get_root();
@@ -695,8 +730,8 @@ compile_parameter(const ShaderArgId        &arg_id,
     return true;
   }
 
-  // Implement some macros. Macros work by altering the
-  // contents of the 'pieces' array, and then falling through.
+  // Implement some macros.  Macros work by altering the contents of the
+  // 'pieces' array, and then falling through.
 
   if (pieces[0] == "mstrans") {
     pieces[0] = "trans";
@@ -793,7 +828,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
 
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._func = SMF_compose;
 
     int next = 1;
@@ -840,6 +875,7 @@ compile_parameter(const ShaderArgId        &arg_id,
     }
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -856,7 +892,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       if (!cp_errchk_parameter_float(p,16,16)) {
         return false;
       }
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._piece = SMP_transpose;
       bind._func = SMF_first;
       bind._part[0] = SMO_attr_material;
@@ -867,7 +903,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       if (!cp_errchk_parameter_float(p,3,4)) {
         return false;
       }
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._piece = SMP_row3;
       bind._func = SMF_first;
       bind._part[0] = SMO_attr_color;
@@ -878,7 +914,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       if (!cp_errchk_parameter_float(p,3,4)) {
         return false;
       }
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._piece = SMP_row3;
       bind._func = SMF_first;
       bind._part[0] = SMO_attr_colorscale;
@@ -889,7 +925,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       if (!cp_errchk_parameter_float(p,3,4)) {
         return false;
       }
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._piece = SMP_row3;
       bind._func = SMF_first;
       bind._part[0] = SMO_attr_fog;
@@ -900,10 +936,21 @@ compile_parameter(const ShaderArgId        &arg_id,
       if (!cp_errchk_parameter_float(p,3,4)) {
         return false;
       }
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._piece = SMP_row3;
       bind._func = SMF_first;
       bind._part[0] = SMO_attr_fogcolor;
+      bind._arg[0] = NULL;
+      bind._part[1] = SMO_identity;
+      bind._arg[1] = NULL;
+    } else if (pieces[1] == "ambient") {
+      if (!cp_errchk_parameter_float(p,3,4)) {
+        return false;
+      }
+      bind._id = p._id;
+      bind._piece = SMP_row3;
+      bind._func = SMF_first;
+      bind._part[0] = SMO_light_ambient;
       bind._arg[0] = NULL;
       bind._part[1] = SMO_identity;
       bind._arg[1] = NULL;
@@ -914,6 +961,7 @@ compile_parameter(const ShaderArgId        &arg_id,
 
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -927,6 +975,7 @@ compile_parameter(const ShaderArgId        &arg_id,
 
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -940,7 +989,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._piece = SMP_row3;
     bind._func = SMF_first;
     bind._part[0] = SMO_alight_x;
@@ -950,6 +999,7 @@ compile_parameter(const ShaderArgId        &arg_id,
 
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -961,7 +1011,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._piece = SMP_row3;
     bind._func = SMF_first;
     bind._part[0] = SMO_satten_x;
@@ -971,6 +1021,7 @@ compile_parameter(const ShaderArgId        &arg_id,
 
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -981,7 +1032,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._piece = SMP_transpose;
     int next = 1;
     pieces.push_back("");
@@ -1012,6 +1063,7 @@ compile_parameter(const ShaderArgId        &arg_id,
     }
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -1023,16 +1075,18 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._piece = SMP_whole;
     bind._func = SMF_first;
-    bind._part[0] = SMO_texmat_x;
-    bind._arg[0] = InternalName::make(pieces[1]);
+    bind._part[0] = SMO_texmat_i;
+    bind._arg[0] = NULL;
     bind._part[1] = SMO_identity;
     bind._arg[1] = NULL;
+    bind._index = atoi(pieces[1].c_str());
 
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -1044,7 +1098,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._piece = SMP_row3;
     bind._func = SMF_first;
     bind._part[0] = SMO_plane_x;
@@ -1054,6 +1108,7 @@ compile_parameter(const ShaderArgId        &arg_id,
 
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -1065,7 +1120,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._piece = SMP_row3;
     bind._func = SMF_first;
     bind._part[0] = SMO_clipplane_x;
@@ -1075,6 +1130,7 @@ compile_parameter(const ShaderArgId        &arg_id,
 
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -1087,7 +1143,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._piece = SMP_row3;
     bind._func = SMF_first;
     bind._part[1] = SMO_identity;
@@ -1121,6 +1177,7 @@ compile_parameter(const ShaderArgId        &arg_id,
 
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -1136,15 +1193,18 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderTexSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._name = 0;
     bind._stage = atoi(pieces[1].c_str());
+    bind._part = STO_stage_i;
     switch (p._type) {
     case SAT_sampler1d:      bind._desired_type = Texture::TT_1d_texture; break;
     case SAT_sampler2d:      bind._desired_type = Texture::TT_2d_texture; break;
     case SAT_sampler3d:      bind._desired_type = Texture::TT_3d_texture; break;
-    case SAT_sampler2dArray: bind._desired_type = Texture::TT_2d_texture_array; break;
-    case SAT_samplercube:    bind._desired_type = Texture::TT_cube_map; break;
+    case SAT_sampler2d_array:bind._desired_type = Texture::TT_2d_texture_array; break;
+    case SAT_sampler_cube:   bind._desired_type = Texture::TT_cube_map; break;
+    case SAT_sampler_buffer: bind._desired_type = Texture::TT_buffer_texture; break;
+    case SAT_sampler_cube_array:bind._desired_type = Texture::TT_cube_map_array; break;
     default:
       cp_report_error(p, "Invalid type for a tex-parameter");
       return false;
@@ -1153,6 +1213,31 @@ compile_parameter(const ShaderArgId        &arg_id,
       bind._suffix = InternalName::make(((string)"-") + pieces[2]);
       shader_cat.warning()
         << "Parameter " << p._id._name << ": use of a texture suffix is deprecated.\n";
+    }
+    _tex_spec.push_back(bind);
+    return true;
+  }
+
+  if (pieces[0] == "shadow") {
+    if ((!cp_errchk_parameter_in(p)) ||
+        (!cp_errchk_parameter_uniform(p)) ||
+        (!cp_errchk_parameter_sampler(p)))
+      return false;
+    if (pieces.size() != 2) {
+      cp_report_error(p, "Invalid parameter name");
+      return false;
+    }
+    ShaderTexSpec bind;
+    bind._id = p._id;
+    bind._name = InternalName::make(pieces[1])->append("shadowMap");
+    bind._stage = -1;
+    bind._part = STO_named_input;
+    switch (p._type) {
+    case SAT_sampler2d:      bind._desired_type = Texture::TT_2d_texture; break;
+    case SAT_sampler_cube:   bind._desired_type = Texture::TT_cube_map; break;
+    default:
+      cp_report_error(p, "Invalid type for a shadow-parameter");
+      return false;
     }
     _tex_spec.push_back(bind);
     return true;
@@ -1168,7 +1253,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._piece = SMP_row3;
     bind._func = SMF_first;
     bind._part[0] = SMO_texpad_x;
@@ -1177,6 +1262,7 @@ compile_parameter(const ShaderArgId        &arg_id,
     bind._arg[1] = NULL;
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
     return true;
   }
 
@@ -1188,7 +1274,7 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
     }
     ShaderMatSpec bind;
-    bind._id = arg_id;
+    bind._id = p._id;
     bind._piece = SMP_row3;
     bind._func = SMF_first;
     bind._part[0] = SMO_texpix_x;
@@ -1197,6 +1283,12 @@ compile_parameter(const ShaderArgId        &arg_id,
     bind._arg[1] = NULL;
     cp_optimize_mat_spec(bind);
     _mat_spec.push_back(bind);
+    _mat_deps |= bind._dep[0] | bind._dep[1];
+    return true;
+  }
+
+  if (pieces[0] == "tbl") {
+    // Handled elsewhere.
     return true;
   }
 
@@ -1235,11 +1327,15 @@ compile_parameter(const ShaderArgId        &arg_id,
       return false;
 
     ShaderPtrSpec bind;
-    bind._id      = arg_id;
+    bind._id      = p._id;
     bind._arg     = kinputname;
     bind._info    = p;
-    bind._dep[0]  = SSD_general | SSD_shaderinputs;
-    bind._dep[1]  = SSD_general | SSD_NONE;
+
+    // We specify SSD_frame because a PTA may be modified by the app from
+    // frame to frame, and we have no way to know.  So, we must respecify a
+    // PTA at least once every frame.
+    bind._dep[0]  = SSD_general | SSD_shaderinputs | SSD_frame;
+    bind._dep[1]  = SSD_NONE;
 
     memcpy(bind._dim,arg_dim,sizeof(int)*3);
 
@@ -1253,41 +1349,64 @@ compile_parameter(const ShaderArgId        &arg_id,
     switch (p._type) {
     case SAT_sampler1d: {
       ShaderTexSpec bind;
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._name = kinputname;
+      bind._part = STO_named_input;
       bind._desired_type = Texture::TT_1d_texture;
       _tex_spec.push_back(bind);
       return true;
     }
     case SAT_sampler2d: {
       ShaderTexSpec bind;
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._name = kinputname;
+      bind._part = STO_named_input;
       bind._desired_type = Texture::TT_2d_texture;
       _tex_spec.push_back(bind);
       return true;
     }
     case SAT_sampler3d: {
       ShaderTexSpec bind;
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._name = kinputname;
+      bind._part = STO_named_input;
       bind._desired_type = Texture::TT_3d_texture;
       _tex_spec.push_back(bind);
       return true;
     }
-    case SAT_sampler2dArray: {
+    case SAT_sampler2d_array: {
       ShaderTexSpec bind;
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._name = kinputname;
+      bind._part = STO_named_input;
       bind._desired_type = Texture::TT_2d_texture_array;
       _tex_spec.push_back(bind);
       return true;
     }
-    case SAT_samplercube: {
+    case SAT_sampler_cube: {
       ShaderTexSpec bind;
-      bind._id = arg_id;
+      bind._id = p._id;
       bind._name = kinputname;
+      bind._part = STO_named_input;
       bind._desired_type = Texture::TT_cube_map;
+      _tex_spec.push_back(bind);
+      return true;
+    }
+    case SAT_sampler_buffer: {
+      ShaderTexSpec bind;
+      bind._id = p._id;
+      bind._name = kinputname;
+      bind._part = STO_named_input;
+      bind._desired_type = Texture::TT_buffer_texture;
+      _tex_spec.push_back(bind);
+      return true;
+    }
+    case SAT_sampler_cube_array: {
+      ShaderTexSpec bind;
+      bind._id = p._id;
+      bind._name = kinputname;
+      bind._part = STO_named_input;
+      bind._desired_type = Texture::TT_cube_map_array;
       _tex_spec.push_back(bind);
       return true;
     }
@@ -1305,12 +1424,9 @@ compile_parameter(const ShaderArgId        &arg_id,
   return false;
 }
 
-
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::clear_parameters
-//       Access: Private
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Shader::
 clear_parameters() {
   _mat_spec.clear();
@@ -1318,12 +1434,37 @@ clear_parameters() {
   _tex_spec.clear();
 }
 
+/**
+ * Called by the back-end when the shader has compiled data available.
+ */
+void Shader::
+set_compiled(unsigned int format, const char *data, size_t length) {
+  _compiled_format = format;
+  _compiled_binary.assign(data, length);
+
+  // Store the compiled shader in the cache.
+  if (_cache_compiled_shader && !_record.is_null()) {
+    _record->set_data(this);
+
+    BamCache *cache = BamCache::get_global_ptr();
+    cache->store(_record);
+  }
+}
+
+/**
+ * Called by the back-end to retrieve compiled data.
+ */
+bool Shader::
+get_compiled(unsigned int &format, string &binary) const {
+  format = _compiled_format;
+  binary = _compiled_binary;
+  return !binary.empty();
+}
+
 #ifdef HAVE_CG
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_parameter_type
-//       Access: Private
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 Shader::ShaderArgType Shader::
 cg_parameter_type(CGparameter p) {
   switch (cgGetParameterClass(p)) {
@@ -1377,23 +1518,24 @@ cg_parameter_type(CGparameter p) {
     case CG_SAMPLER1D:      return Shader::SAT_sampler1d;
     case CG_SAMPLER2D:      return Shader::SAT_sampler2d;
     case CG_SAMPLER3D:      return Shader::SAT_sampler3d;
-    case CG_SAMPLER2DARRAY: return Shader::SAT_sampler2dArray;
-    case CG_SAMPLERCUBE:    return Shader::SAT_samplercube;
+    case CG_SAMPLER2DARRAY: return Shader::SAT_sampler2d_array;
+    case CG_SAMPLERCUBE:    return Shader::SAT_sampler_cube;
+    case CG_SAMPLERBUF:     return Shader::SAT_sampler_buffer;
+    case CG_SAMPLERCUBEARRAY:return Shader::SAT_sampler_cube_array;
     // CG_SAMPLER1DSHADOW and CG_SAMPLER2DSHADOW
     case 1313:              return Shader::SAT_sampler1d;
     case 1314:              return Shader::SAT_sampler2d;
     default: return SAT_unknown;
     }
   case CG_PARAMETERCLASS_ARRAY: return SAT_unknown;
-  default: return SAT_unknown;
+  default:
+    return SAT_unknown;
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_parameter_class
-//       Access: Private
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 Shader::ShaderArgClass Shader::cg_parameter_class(CGparameter p) {
   switch (cgGetParameterClass(p)) {
   case CG_PARAMETERCLASS_SCALAR:  return Shader::SAC_scalar;
@@ -1405,11 +1547,9 @@ Shader::ShaderArgClass Shader::cg_parameter_class(CGparameter p) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_parameter_dir
-//       Access: Private
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 Shader::ShaderArgDir Shader::
 cg_parameter_dir(CGparameter p) {
   switch (cgGetParameterDirection(p)) {
@@ -1420,11 +1560,9 @@ cg_parameter_dir(CGparameter p) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_release_resources
-//       Access: Private
-//  Description: xyz
-////////////////////////////////////////////////////////////////////
+/**
+ * xyz
+ */
 void Shader::
 cg_release_resources() {
   if (_cg_vprogram != 0) {
@@ -1441,11 +1579,9 @@ cg_release_resources() {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_compile_entry_point
-//       Access: Private
-//  Description: xyz
-////////////////////////////////////////////////////////////////////
+/**
+ * xyz
+ */
 CGprogram Shader::
 cg_compile_entry_point(const char *entry, const ShaderCaps &caps,
                        CGcontext context, ShaderType type) {
@@ -1485,21 +1621,25 @@ cg_compile_entry_point(const char *entry, const ShaderCaps &caps,
     ultimate = CG_PROFILE_UNKNOWN;
   };
 
-  cgGetError();
-
   if (type == ST_fragment && caps._bug_list.count(SBUG_ati_draw_buffers)) {
     compiler_args[nargs++] = "-po";
     compiler_args[nargs++] = "ATI_draw_buffers";
   }
 
-  char version_arg[16];
-  if (!cg_glsl_version.empty() && cgGetProfileProperty((CGprofile) active, CG_IS_GLSL_PROFILE)) {
-    snprintf(version_arg, 16, "version=%s", cg_glsl_version.c_str());
+  string version_arg;
+  if (!cg_glsl_version.empty() && active != CG_PROFILE_UNKNOWN &&
+      cgGetProfileProperty((CGprofile) active, CG_IS_GLSL_PROFILE)) {
+
+    version_arg = "version=";
+    version_arg += cg_glsl_version;
+
     compiler_args[nargs++] = "-po";
-    compiler_args[nargs++] = version_arg;
+    compiler_args[nargs++] = version_arg.c_str();
   }
 
   compiler_args[nargs] = 0;
+
+  cgGetError();
 
   if ((active != (int)CG_PROFILE_UNKNOWN) && (active != ultimate)) {
     // Print out some debug information about what we're doing.
@@ -1530,6 +1670,12 @@ cg_compile_entry_point(const char *entry, const ShaderCaps &caps,
     if (shader_cat.is_debug()) {
       shader_cat.debug()
         << "Compilation with active profile failed: " << cgGetErrorString(err) << "\n";
+      if (err == CG_COMPILER_ERROR) {
+        const char *listing = cgGetLastListing(context);
+        if (listing != NULL) {
+          shader_cat.debug(false) << listing;
+        }
+      }
     }
   }
 
@@ -1566,19 +1712,22 @@ cg_compile_entry_point(const char *entry, const ShaderCaps &caps,
     return prog;
   }
 
+  if (shader_cat.is_debug()) {
+    shader_cat.debug()
+      << "Compilation with ultimate profile failed: " << cgGetErrorString(err) << "\n";
+  }
+
   if (prog != 0) {
     cgDestroyProgram(prog);
   }
   return 0;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_compile_shader
-//       Access: Private
-//  Description: Compiles a Cg shader for a given set of capabilities.
-//               If successful, the shader is stored in the instance
-//               variables _cg_context, _cg_vprogram, _cg_fprogram.
-////////////////////////////////////////////////////////////////////
+/**
+ * Compiles a Cg shader for a given set of capabilities.  If successful, the
+ * shader is stored in the instance variables _cg_context, _cg_vprogram,
+ * _cg_fprogram.
+ */
 bool Shader::
 cg_compile_shader(const ShaderCaps &caps, CGcontext context) {
   _cg_last_caps = caps;
@@ -1616,6 +1765,69 @@ cg_compile_shader(const ShaderCaps &caps, CGcontext context) {
     return false;
   }
 
+  // This is present to work around a bug in the Cg compiler for Direct3D 9.
+  // It generates "texld_sat" instructions that the result in an
+  // D3DXERR_INVALIDDATA error when trying to load the shader, since the _sat
+  // modifier may not be used on tex* instructions.
+  if (_cg_fprofile == CG_PROFILE_PS_2_0 ||
+      _cg_fprofile == CG_PROFILE_PS_2_X ||
+      _cg_fprofile == CG_PROFILE_PS_3_0) {
+    vector_string lines;
+    tokenize(cgGetProgramString(_cg_fprogram, CG_COMPILED_PROGRAM), lines, "\n");
+
+    ostringstream out;
+    int num_modified = 0;
+
+    for (size_t i = 0; i < lines.size(); ++i) {
+      const string &line = lines[i];
+
+      size_t space = line.find(' ');
+      if (space == string::npos) {
+        out << line << '\n';
+        continue;
+      }
+
+      string instr = line.substr(0, space);
+
+      // Look for a texld instruction with _sat modifier.
+      if (instr.compare(0, 5, "texld") == 0 &&
+          instr.compare(instr.size() - 4, 4, "_sat") == 0) {
+        // Which destination register are we operating on?
+        string reg = line.substr(space + 1, line.find(',', space) - space - 1);
+
+        // Move the saturation operation to a separate instruction.
+        instr.resize(instr.size() - 4);
+        out << instr << ' ' << line.substr(space + 1) << '\n';
+        out << "mov_sat " << reg << ", " << reg << '\n';
+        ++num_modified;
+      } else {
+        out << line << '\n';
+      }
+    }
+
+    if (num_modified > 0) {
+      string result = out.str();
+      CGprogram new_program;
+      new_program = cgCreateProgram(context, CG_OBJECT, result.c_str(),
+                                    (CGprofile)_cg_fprofile, "fshader",
+                                    (const char**)NULL);
+      if (new_program) {
+        cgDestroyProgram(_cg_fprogram);
+        _cg_fprogram = new_program;
+
+        if (shader_cat.is_debug()) {
+          shader_cat.debug()
+            << "Replaced " << num_modified << " invalid texld_sat instruction"
+            << ((num_modified == 1) ? "" : "s") << " in compiled shader\n";
+        }
+      } else {
+        shader_cat.warning()
+          << "Failed to load shader with fixed texld_sat instructions: "
+          << cgGetErrorString(cgGetError()) << "\n";
+      }
+    }
+  }
+
   // DEBUG: output the generated program
   if (shader_cat.is_debug()) {
     const char *vertex_program;
@@ -1626,30 +1838,28 @@ cg_compile_shader(const ShaderCaps &caps, CGcontext context) {
       shader_cat.debug()
         << "Cg vertex profile: " << cgGetProfileString((CGprofile)_cg_vprofile) << "\n";
       vertex_program = cgGetProgramString(_cg_vprogram, CG_COMPILED_PROGRAM);
-      shader_cat.debug() << vertex_program << "\n";
+      shader_cat.spam() << vertex_program << "\n";
     }
     if (_cg_fprogram != 0) {
       shader_cat.debug()
         << "Cg fragment profile: " << cgGetProfileString((CGprofile)_cg_fprofile) << "\n";
       fragment_program = cgGetProgramString(_cg_fprogram, CG_COMPILED_PROGRAM);
-      shader_cat.debug() << fragment_program << "\n";
+      shader_cat.spam() << fragment_program << "\n";
     }
     if (_cg_gprogram != 0) {
       shader_cat.debug()
         << "Cg geometry profile: " << cgGetProfileString((CGprofile)_cg_gprofile) << "\n";
       geometry_program = cgGetProgramString(_cg_gprogram, CG_COMPILED_PROGRAM);
-      shader_cat.debug() << geometry_program << "\n";
+      shader_cat.spam() << geometry_program << "\n";
     }
   }
 
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_analyze_entry_point
-//       Access: Private
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 bool Shader::
 cg_analyze_entry_point(CGprogram prog, ShaderType type) {
   bool success = true;
@@ -1658,38 +1868,30 @@ cg_analyze_entry_point(CGprogram prog, ShaderType type) {
   return success;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_analyze_shader
-//       Access: Private
-//  Description: This subroutine analyzes the parameters of a Cg
-//               shader. The output is stored in instance variables:
-//               _mat_spec, _var_spec, and _tex_spec.
-//
-//               In order to do this, it is necessary to compile the
-//               shader.  It would be a waste of CPU time to compile
-//               the shader, analyze the parameters, and then discard
-//               the compiled shader.  This would force us to compile it
-//               again later, when we need to build the ShaderContext.
-//               Instead, we cache the compiled Cg program in instance
-//               variables.  Later, a ShaderContext can pull the
-//               compiled shader from these instance vars.
-//
-//               To compile a shader, you need to first choose a profile.
-//               There are two contradictory objectives:
-//
-//               1. If you don't use the gsg's active profile,
-//               then the cached compiled shader will not be useful to
-//               the ShaderContext.
-//
-//               2. If you use too weak a profile, then the shader may
-//               not compile.  So to guarantee success, you should use
-//               the ultimate profile.
-//
-//               To resolve this conflict, we try the active profile
-//               first, and if that doesn't work, we try the ultimate
-//               profile.
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * This subroutine analyzes the parameters of a Cg shader.  The output is
+ * stored in instance variables: _mat_spec, _var_spec, and _tex_spec.
+ *
+ * In order to do this, it is necessary to compile the shader.  It would be a
+ * waste of CPU time to compile the shader, analyze the parameters, and then
+ * discard the compiled shader.  This would force us to compile it again
+ * later, when we need to build the ShaderContext.  Instead, we cache the
+ * compiled Cg program in instance variables.  Later, a ShaderContext can pull
+ * the compiled shader from these instance vars.
+ *
+ * To compile a shader, you need to first choose a profile.  There are two
+ * contradictory objectives:
+ *
+ * 1. If you don't use the gsg's active profile, then the cached compiled
+ * shader will not be useful to the ShaderContext.
+ *
+ * 2. If you use too weak a profile, then the shader may not compile.  So to
+ * guarantee success, you should use the ultimate profile.
+ *
+ * To resolve this conflict, we try the active profile first, and if that
+ * doesn't work, we try the ultimate profile.
+ *
+ */
 bool Shader::
 cg_analyze_shader(const ShaderCaps &caps) {
 
@@ -1739,106 +1941,106 @@ cg_analyze_shader(const ShaderCaps &caps) {
     }
   }
 
-  // Assign sequence numbers to all parameters.
+  // Assign sequence numbers to all parameters.  GLCgShaderContext relies on
+  // the fact that the varyings start at seqno 0.
   int seqno = 0;
-  for (int i=0; i<(int)_mat_spec.size(); i++) {
-    _mat_spec[i]._id._seqno = seqno++;
-  }
-  for (int i=0; i<(int)_tex_spec.size(); i++) {
-    _tex_spec[i]._id._seqno = seqno++;
-  }
-  for (int i=0; i<(int)_var_spec.size(); i++) {
+  for (size_t i = 0; i < _var_spec.size(); ++i) {
     _var_spec[i]._id._seqno = seqno++;
   }
+  for (size_t i = 0; i < _mat_spec.size(); ++i) {
+    _mat_spec[i]._id._seqno = seqno++;
+  }
+  for (size_t i = 0; i < _tex_spec.size(); ++i) {
+    _tex_spec[i]._id._seqno = seqno++;
+  }
 
-  for (int i=0; i<(int)_ptr_spec.size(); i++) {
+  for (size_t i = 0; i < _ptr_spec.size(); ++i) {
     _ptr_spec[i]._id._seqno = seqno++;
     _ptr_spec[i]._info._id = _ptr_spec[i]._id;
   }
 
-  //  // The following code is present to work around a bug in the Cg compiler.
-  //  // It does not generate correct code for shadow map lookups when using arbfp1.
-  //  // This is a particularly onerous limitation, given that arbfp1 is the only
-  //  // Cg target that works on radeons.  I suspect this is an intentional
-  //  // omission on nvidia's part.  The following code fetches the output listing,
-  //  // detects the error, repairs the code, and resumbits the repaired code to Cg.
-  //  if ((_cg_fprofile == CG_PROFILE_ARBFP1) && (gsghint->_supports_shadow_filter)) {
-  //    bool shadowunit[32];
-  //    bool anyshadow = false;
-  //    memset(shadowunit, 0, sizeof(shadowunit));
-  //    vector_string lines;
-  //    tokenize(cgGetProgramString(_cg_program[SHADER_type_frag],
-  //                                CG_COMPILED_PROGRAM), lines, "\n");
-  //    // figure out which texture units contain shadow maps.
-  //    for (int lineno=0; lineno<(int)lines.size(); lineno++) {
-  //      if (lines[lineno].compare(0,21,"#var sampler2DSHADOW ")) {
-  //        continue;
-  //      }
-  //      vector_string fields;
-  //      tokenize(lines[lineno], fields, ":");
-  //      if (fields.size()!=5) {
-  //        continue;
-  //      }
-  //      vector_string words;
-  //      tokenize(trim(fields[2]), words, " ");
-  //      if (words.size()!=2) {
-  //        continue;
-  //      }
-  //      int unit = atoi(words[1].c_str());
-  //      if ((unit < 0)||(unit >= 32)) {
-  //        continue;
-  //      }
-  //      anyshadow = true;
-  //      shadowunit[unit] = true;
-  //    }
-  //    // modify all TEX statements that use the relevant texture units.
-  //    if (anyshadow) {
-  //      for (int lineno=0; lineno<(int)lines.size(); lineno++) {
-  //        if (lines[lineno].compare(0,4,"TEX ")) {
-  //          continue;
-  //        }
-  //        vector_string fields;
-  //        tokenize(lines[lineno], fields, ",");
-  //        if ((fields.size()!=4)||(trim(fields[3]) != "2D;")) {
-  //          continue;
-  //        }
-  //        vector_string texunitf;
-  //        tokenize(trim(fields[2]), texunitf, "[]");
-  //        if ((texunitf.size()!=3)||(texunitf[0] != "texture")||(texunitf[2]!="")) {
-  //          continue;
-  //        }
-  //        int unit = atoi(texunitf[1].c_str());
-  //        if ((unit < 0) || (unit >= 32) || (shadowunit[unit]==false)) {
-  //          continue;
-  //        }
-  //        lines[lineno] = fields[0]+","+fields[1]+","+fields[2]+", SHADOW2D;";
-  //      }
-  //      string result = "!!ARBfp1.0\nOPTION ARB_fragment_program_shadow;\n";
-  //      for (int lineno=1; lineno<(int)lines.size(); lineno++) {
-  //        result += (lines[lineno] + "\n");
-  //      }
-  //      _cg_program[2] = _cg_program[SHADER_type_frag];
-  //      _cg_program[SHADER_type_frag] =
-  //        cgCreateProgram(_cg_context, CG_OBJECT, result.c_str(),
-  //                        _cg_profile[SHADER_type_frag], "fshader", (const char**)NULL);
-  //      cg_report_errors(s->get_name(), _cg_context);
-  //      if (_cg_program[SHADER_type_frag]==0) {
-  //        release_resources();
-  //        return false;
-  //      }
-  //    }
-  //  }
+  /*
+  // The following code is present to work around a bug in the Cg compiler.
+  // It does not generate correct code for shadow map lookups when using arbfp1.
+  // This is a particularly onerous limitation, given that arbfp1 is the only
+  // Cg target that works on radeons.  I suspect this is an intentional
+  // omission on nvidia's part.  The following code fetches the output listing,
+  // detects the error, repairs the code, and resumbits the repaired code to Cg.
+  if ((_cg_fprofile == CG_PROFILE_ARBFP1) && (gsghint->_supports_shadow_filter)) {
+    bool shadowunit[32];
+    bool anyshadow = false;
+    memset(shadowunit, 0, sizeof(shadowunit));
+    vector_string lines;
+    tokenize(cgGetProgramString(_cg_program[SHADER_type_frag],
+                                CG_COMPILED_PROGRAM), lines, "\n");
+    // figure out which texture units contain shadow maps.
+    for (int lineno=0; lineno<(int)lines.size(); lineno++) {
+      if (lines[lineno].compare(0,21,"#var sampler2DSHADOW ")) {
+        continue;
+      }
+      vector_string fields;
+      tokenize(lines[lineno], fields, ":");
+      if (fields.size()!=5) {
+        continue;
+      }
+      vector_string words;
+      tokenize(trim(fields[2]), words, " ");
+      if (words.size()!=2) {
+        continue;
+      }
+      int unit = atoi(words[1].c_str());
+      if ((unit < 0)||(unit >= 32)) {
+        continue;
+      }
+      anyshadow = true;
+      shadowunit[unit] = true;
+    }
+    // modify all TEX statements that use the relevant texture units.
+    if (anyshadow) {
+      for (int lineno=0; lineno<(int)lines.size(); lineno++) {
+        if (lines[lineno].compare(0,4,"TEX ")) {
+          continue;
+        }
+        vector_string fields;
+        tokenize(lines[lineno], fields, ",");
+        if ((fields.size()!=4)||(trim(fields[3]) != "2D;")) {
+          continue;
+        }
+        vector_string texunitf;
+        tokenize(trim(fields[2]), texunitf, "[]");
+        if ((texunitf.size()!=3)||(texunitf[0] != "texture")||(texunitf[2]!="")) {
+          continue;
+        }
+        int unit = atoi(texunitf[1].c_str());
+        if ((unit < 0) || (unit >= 32) || (shadowunit[unit]==false)) {
+          continue;
+        }
+        lines[lineno] = fields[0]+","+fields[1]+","+fields[2]+", SHADOW2D;";
+      }
+      string result = "!!ARBfp1.0\nOPTION ARB_fragment_program_shadow;\n";
+      for (int lineno=1; lineno<(int)lines.size(); lineno++) {
+        result += (lines[lineno] + "\n");
+      }
+      _cg_program[2] = _cg_program[SHADER_type_frag];
+      _cg_program[SHADER_type_frag] =
+        cgCreateProgram(_cg_context, CG_OBJECT, result.c_str(),
+                        _cg_profile[SHADER_type_frag], "fshader", (const char**)NULL);
+      cg_report_errors(s->get_name(), _cg_context);
+      if (_cg_program[SHADER_type_frag]==0) {
+        release_resources();
+        return false;
+      }
+    }
+  }
+  */
 
   cg_release_resources();
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_program_from_shadertype
-//       Access: Private
-//  Description: Returns the CGprogram of the given shadertype
-//               that belongs to this shader.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the CGprogram of the given shadertype that belongs to this shader.
+ */
 CGprogram Shader::
 cg_program_from_shadertype(ShaderType type) {
   switch (type) {
@@ -1856,14 +2058,11 @@ cg_program_from_shadertype(ShaderType type) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::cg_compile_for
-//       Access: Public
-//  Description: This routine is used by the ShaderContext constructor
-//               to compile the shader.  The CGprogram
-//               objects are turned over to the ShaderContext, we no
-//               longer own them.
-////////////////////////////////////////////////////////////////////
+/**
+ * This routine is used by the ShaderContext constructor to compile the
+ * shader.  The CGprogram objects are turned over to the ShaderContext, we no
+ * longer own them.
+ */
 bool Shader::
 cg_compile_for(const ShaderCaps &caps, CGcontext context,
                CGprogram &combined_program, pvector<CGparameter> &map) {
@@ -1872,17 +2071,16 @@ cg_compile_for(const ShaderCaps &caps, CGcontext context,
   combined_program = 0;
   map.clear();
 
-  // Make sure the shader is compiled for the target caps.
-  // Most of the time, it will already be - this is usually a no-op.
+  // Make sure the shader is compiled for the target caps.  Most of the time,
+  // it will already be - this is usually a no-op.
 
   _default_caps = caps;
   if (!cg_compile_shader(caps, context)) {
     return false;
   }
 
-  // If the compile routine used the ultimate profile instead of the
-  // active one, it means the active one isn't powerful enough to
-  // compile the shader.
+  // If the compile routine used the ultimate profile instead of the active
+  // one, it means the active one isn't powerful enough to compile the shader.
   if (_cg_vprogram != 0 && _cg_vprofile != caps._active_vprofile) {
     shader_cat.error() << "Cg vertex program not supported by profile "
       << cgGetProfileString((CGprofile) caps._active_vprofile) << ": "
@@ -1915,20 +2113,20 @@ cg_compile_for(const ShaderCaps &caps, CGcontext context,
   }
 
   // Combine the programs.  This can be more optimal than loading them
-  // individually, and it is even necessary for some profiles
-  // (particularly GLSL profiles on non-NVIDIA GPUs).
+  // individually, and it is even necessary for some profiles (particularly
+  // GLSL profiles on non-NVIDIA GPUs).
   combined_program = cgCombinePrograms(programs.size(), &programs[0]);
 
   // Build a parameter map.
-  int n_mat = (int)_mat_spec.size();
-  int n_tex = (int)_tex_spec.size();
-  int n_var = (int)_var_spec.size();
-  int n_ptr = (int)_ptr_spec.size();
+  size_t n_mat = _mat_spec.size();
+  size_t n_tex = _tex_spec.size();
+  size_t n_var = _var_spec.size();
+  size_t n_ptr = _ptr_spec.size();
 
   map.resize(n_mat + n_tex + n_var + n_ptr);
 
-  // This is a bit awkward, we have to go in and seperate out the
-  // combined program, since all the parameter bindings have changed.
+  // This is a bit awkward, we have to go in and seperate out the combined
+  // program, since all the parameter bindings have changed.
   CGprogram programs_by_type[ST_COUNT];
   for (int i = 0; i < cgGetNumProgramDomains(combined_program); ++i) {
     // Conveniently, the CGdomain enum overlaps with ShaderType.
@@ -1936,12 +2134,20 @@ cg_compile_for(const ShaderCaps &caps, CGcontext context,
     programs_by_type[cgGetProgramDomain(program)] = program;
   }
 
-  for (int i = 0; i < n_mat; ++i) {
+  for (size_t i = 0; i < n_mat; ++i) {
     const ShaderArgId &id = _mat_spec[i]._id;
     map[id._seqno] = cgGetNamedParameter(programs_by_type[id._type], id._name.c_str());
+
+    if (shader_cat.is_debug()) {
+      const char *resource = cgGetParameterResourceName(map[id._seqno]);
+      if (resource != NULL) {
+        shader_cat.debug() << "Uniform parameter " << id._name
+                           << " is bound to resource " << resource << "\n";
+      }
+    }
   }
 
-  for (int i = 0; i < n_tex; ++i) {
+  for (size_t i = 0; i < n_tex; ++i) {
     const ShaderArgId &id = _tex_spec[i]._id;
     CGparameter p = cgGetNamedParameter(programs_by_type[id._type], id._name.c_str());
 
@@ -1949,66 +2155,44 @@ cg_compile_for(const ShaderCaps &caps, CGcontext context,
       const char *resource = cgGetParameterResourceName(p);
       if (resource != NULL) {
         shader_cat.debug() << "Texture parameter " << id._name
-                         << " is bound to resource " << resource << "\n";
+                          << " is bound to resource " << resource << "\n";
       }
     }
     map[id._seqno] = p;
   }
 
-  for (int i = 0; i < n_var; ++i) {
+  for (size_t i = 0; i < n_var; ++i) {
     const ShaderArgId &id = _var_spec[i]._id;
     CGparameter p = cgGetNamedParameter(programs_by_type[id._type], id._name.c_str());
 
     const char *resource = cgGetParameterResourceName(p);
     if (shader_cat.is_debug() && resource != NULL) {
-      shader_cat.debug()
-        << "Varying parameter " << id._name << " is bound to resource "
-        << cgGetParameterResourceName(p) << "\n";
+      if (cgGetParameterResource(p) == CG_GLSL_ATTRIB) {
+        shader_cat.debug()
+          << "Varying parameter " << id._name << " is bound to GLSL attribute "
+          << resource << "\n";
+      } else {
+        shader_cat.debug()
+          << "Varying parameter " << id._name << " is bound to resource "
+          << resource << " (" << cgGetParameterResource(p)
+          << ", index " << cgGetParameterResourceIndex(p) << ")\n";
+      }
     }
 
-    if (cgGetParameterBaseResource(p) == CG_UNDEFINED) {
-      // I really don't know what this means, but it happens when I
-      // use the NORMAL0 semantic instead of NORMAL, or POSITION0
-      // instead of POSITION, etc.  Not catching this results in a
-      // continuous stream of errors at the renderer side.
-      shader_cat.error()
-        << "Varying parameter " << id._name;
-
-      const char *semantic = cgGetParameterSemantic(p);
-      if (semantic != NULL) {
-        shader_cat.error(false) << " : " << semantic;
-      }
-      if (resource != NULL) {
-        shader_cat.error(false) << " (bound to resource " << resource << ")";
-      }
-      shader_cat.error(false) << " is invalid!\n";
-
-#ifndef NDEBUG
-      // Let's try to give the developer a hint...
-      if (semantic != NULL) {
-        if (strcmp(semantic, "POSITION0") == 0) {
-          shader_cat.error() << "Try using the semantic POSITION instead of POSITION0.\n";
-        } else if (strcmp(semantic, "NORMAL0") == 0) {
-          shader_cat.error() << "Try using the semantic NORMAL instead of NORMAL0.\n";
-        } else if (strcmp(semantic, "DIFFUSE0") == 0) {
-          shader_cat.error() << "Try using the semantic DIFFUSE instead of DIFFUSE0.\n";
-        } else if (strcmp(semantic, "SPECULAR0") == 0) {
-          shader_cat.error() << "Try using the semantic SPECULAR instead of SPECULAR0.\n";
-        } else if (strcmp(semantic, "FOGCOORD0") == 0) {
-          shader_cat.error() << "Try using the semantic FOGCOORD instead of FOGCOORD0.\n";
-        } else if (strcmp(semantic, "PSIZE0") == 0) {
-          shader_cat.error() << "Try using the semantic PSIZE instead of PSIZE0.\n";
-        }
-      }
-#endif  // NDEBUG
-      p = 0;
-    }
     map[id._seqno] = p;
   }
 
-  for (int i = 0; i < n_ptr; ++i) {
+  for (size_t i = 0; i < n_ptr; ++i) {
     const ShaderArgId &id = _ptr_spec[i]._id;
     map[id._seqno] = cgGetNamedParameter(programs_by_type[id._type], id._name.c_str());
+
+    if (shader_cat.is_debug()) {
+      const char *resource = cgGetParameterResourceName(map[id._seqno]);
+      if (resource != NULL) {
+        shader_cat.debug() << "Uniform ptr parameter " << id._name
+                           << " is bound to resource " << resource << "\n";
+      }
+    }
   }
 
   // Transfer ownership of the compiled shader.
@@ -2031,19 +2215,18 @@ cg_compile_for(const ShaderCaps &caps, CGcontext context,
 }
 #endif  // HAVE_CG
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::Constructor
-//       Access: Private
-//  Description: Construct a Shader that will be filled in using
-//               fillin() or read() later.
-////////////////////////////////////////////////////////////////////
+/**
+ * Construct a Shader that will be filled in using fillin() or read() later.
+ */
 Shader::
 Shader(ShaderLanguage lang) :
   _error_flag(false),
   _parse(0),
   _loaded(false),
   _language(lang),
-  _last_modified(0)
+  _last_modified(0),
+  _mat_deps(0),
+  _cache_compiled_shader(false)
 {
 #ifdef HAVE_CG
   _cg_vprogram = 0;
@@ -2053,9 +2236,9 @@ Shader(ShaderLanguage lang) :
   _cg_fprofile = CG_PROFILE_UNKNOWN;
   _cg_gprofile = CG_PROFILE_UNKNOWN;
   if (_default_caps._ultimate_vprofile == 0 || _default_caps._ultimate_vprofile == CG_PROFILE_UNKNOWN) {
-    _default_caps._active_vprofile = CG_PROFILE_UNKNOWN;
-    _default_caps._active_fprofile = CG_PROFILE_UNKNOWN;
-    _default_caps._active_gprofile = CG_PROFILE_UNKNOWN;
+    _default_caps._active_vprofile = CG_PROFILE_GENERIC;
+    _default_caps._active_fprofile = CG_PROFILE_GENERIC;
+    _default_caps._active_gprofile = CG_PROFILE_GENERIC;
     _default_caps._ultimate_vprofile = cgGetProfile("glslv");
     _default_caps._ultimate_fprofile = cgGetProfile("glslf");
     _default_caps._ultimate_gprofile = cgGetProfile("glslg");
@@ -2066,14 +2249,12 @@ Shader(ShaderLanguage lang) :
 #endif
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::read
-//       Access: Private
-//  Description: Reads the shader from the given filename(s).
-//               Returns a boolean indicating success or failure.
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads the shader from the given filename(s). Returns a boolean indicating
+ * success or failure.
+ */
 bool Shader::
-read(const ShaderFile &sfile) {
+read(const ShaderFile &sfile, BamCacheRecord *record) {
   _text._separate = sfile._separate;
 
   if (sfile._separate) {
@@ -2083,30 +2264,37 @@ read(const ShaderFile &sfile) {
       return false;
     }
 
-    if (!sfile._vertex.empty() && !do_read_source(_text._vertex, sfile._vertex)) {
+    if (!sfile._vertex.empty() &&
+        !do_read_source(_text._vertex, sfile._vertex, record)) {
       return false;
     }
-    if (!sfile._fragment.empty() && !do_read_source(_text._fragment, sfile._fragment)) {
+    if (!sfile._fragment.empty() &&
+        !do_read_source(_text._fragment, sfile._fragment, record)) {
       return false;
     }
-    if (!sfile._geometry.empty() && !do_read_source(_text._geometry, sfile._geometry)) {
+    if (!sfile._geometry.empty() &&
+        !do_read_source(_text._geometry, sfile._geometry, record)) {
       return false;
     }
-    if (!sfile._tess_control.empty() && !do_read_source(_text._tess_control, sfile._tess_control)) {
+    if (!sfile._tess_control.empty() &&
+        !do_read_source(_text._tess_control, sfile._tess_control, record)) {
       return false;
     }
-    if (!sfile._tess_evaluation.empty() && !do_read_source(_text._tess_evaluation, sfile._tess_evaluation)) {
+    if (!sfile._tess_evaluation.empty() &&
+        !do_read_source(_text._tess_evaluation, sfile._tess_evaluation, record)) {
       return false;
     }
-    if (!sfile._compute.empty() && !do_read_source(_text._compute, sfile._compute)) {
+    if (!sfile._compute.empty() &&
+        !do_read_source(_text._compute, sfile._compute, record)) {
       return false;
     }
     _filename = sfile;
 
   } else {
-    if (!do_read_source(_text._shared, sfile._shared)) {
+    if (!do_read_source(_text._shared, sfile._shared, record)) {
       return false;
     }
+    _fullpath = _source_files[0];
     _filename = sfile;
 
     // Determine which language the shader is written in.
@@ -2152,22 +2340,19 @@ read(const ShaderFile &sfile) {
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::do_read_source
-//       Access: Private
-//  Description: Reads the shader file from the given path into the
-//               given string.
-//
-//               Returns false if there was an error with this shader
-//               bad enough to consider it 'invalid'.
-////////////////////////////////////////////////////////////////////
+/**
+ * Reads the shader file from the given path into the given string.
+ *
+ * Returns false if there was an error with this shader bad enough to consider
+ * it 'invalid'.
+ */
 bool Shader::
-do_read_source(string &into, const Filename &fn) {
+do_read_source(string &into, const Filename &fn, BamCacheRecord *record) {
   if (_language == SL_GLSL && glsl_preprocess) {
     // Preprocess the GLSL file as we read it.
     set<Filename> open_files;
     ostringstream sstr;
-    if (!r_preprocess_source(sstr, fn, Filename(), open_files)) {
+    if (!r_preprocess_source(sstr, fn, Filename(), open_files, record)) {
       return false;
     }
     into = sstr.str();
@@ -2189,29 +2374,32 @@ do_read_source(string &into, const Filename &fn) {
       return false;
     }
 
+    if (record != (BamCacheRecord *)NULL) {
+      record->add_dependent_file(vf);
+    }
     _last_modified = max(_last_modified, vf->get_timestamp());
     _source_files.push_back(vf->get_filename());
   }
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::r_preprocess_source
-//       Access: Private
-//  Description: Loads a given GLSL file line by line, and processes
-//               any #pragma include and once statements.
-//
-//               The set keeps track of which files we have already
-//               included, for checking recursive includes.
-////////////////////////////////////////////////////////////////////
+/**
+ * Loads a given GLSL file line by line, and processes any #pragma include and
+ * once statements, as well as removes any comments.
+ *
+ * The set keeps track of which files we have already included, for checking
+ * recursive includes.
+ */
 bool Shader::
 r_preprocess_source(ostream &out, const Filename &fn,
                     const Filename &source_dir,
-                    set<Filename> &once_files, int depth) {
+                    set<Filename> &once_files,
+                    BamCacheRecord *record, int depth) {
 
   if (depth > glsl_include_recursion_limit) {
     shader_cat.error()
-      << "#pragma include nested too deeply\n";
+      << "GLSL includes nested too deeply, raise glsl-include-recursion-limit"
+         " if necessary\n";
     return false;
   }
 
@@ -2241,22 +2429,23 @@ r_preprocess_source(ostream &out, const Filename &fn,
     return false;
   }
 
+  if (record != (BamCacheRecord *)NULL) {
+    record->add_dependent_file(vf);
+  }
   _last_modified = max(_last_modified, vf->get_timestamp());
   _source_files.push_back(full_fn);
 
-  // We give each file an unique index.  This is so that we can identify
-  // a particular shader in the error output.  We offset them by 2048
-  // so that they are more recognizable.  GLSL doesn't give us anything
-  // more useful than that, unfortunately.
-  //
-  // Don't do this for the top-level file, though.  We don't want
-  // anything to get in before a potential #version directive.
+  // We give each file an unique index.  This is so that we can identify a
+  // particular shader in the error output.  We offset them by 2048 so that
+  // they are more recognizable.  GLSL doesn't give us anything more useful
+  // than that, unfortunately.  Don't do this for the top-level file, though.
+  // We don't want anything to get in before a potential #version directive.
   int fileno = 0;
   if (depth > 0) {
     fileno = 2048 + _included_files.size();
-    // Write it into the vector so that we can substitute it later
-    // when we are parsing the GLSL error log.  Don't store the full
-    // filename because it would just be too long to display.
+    // Write it into the vector so that we can substitute it later when we are
+    // parsing the GLSL error log.  Don't store the full filename because it
+    // would just be too long to display.
     _included_files.push_back(fn);
 
     out << "#line 1 " << fileno << " // " << fn << "\n";
@@ -2271,58 +2460,227 @@ r_preprocess_source(ostream &out, const Filename &fn,
 
   // Iterate over the lines for things we may need to preprocess.
   string line;
+  int ext_google_include = 0; // 1 = warn, 2 = enable
+  int ext_google_line = 0;
   bool had_include = false;
   int lineno = 0;
   while (getline(*source, line)) {
-    // We always forward the actual line - the GLSL compiler will
-    // silently ignore #pragma lines anyway.
     ++lineno;
-    out << line << "\n";
 
-    // Check if this line contains a #pragma.
-    char pragma[64];
-    if (line.size() < 8 ||
-        sscanf(line.c_str(), " # pragma %63s", pragma) != 1) {
-
-      // One exception: check for an #endif after an include.  We have
-      // to restore the line number in case the include happened under
-      // an #if block.
-      int nread = 0;
-      if (had_include && sscanf(line.c_str(), " # endif %n", &nread) == 0 && nread >= 6) {
-        out << "#line " << (lineno + 1) << " " << fileno << "\n";
-      }
+    if (line.empty()) {
+      out.put('\n');
       continue;
     }
 
-    int nread = 0;
-    if (strcmp(pragma, "include") == 0) {
-      // Allow both double quotes and angle brackets.
-      Filename incfn, source_dir;
-      {
-        char incfile[2048];
-        if (sscanf(line.c_str(), " # pragma%*[ \t]include \"%2047[^\"]\" %n", incfile, &nread) == 1
-            && nread == line.size()) {
-          // A regular include, with double quotes.  Probably a local file.
-          source_dir = full_fn.get_dirname();
-          incfn = incfile;
+    // If the line ends with a backslash, concatenate the following line.
+    // Preprocessor definitions may be broken up into multiple lines.
+    while (line[line.size() - 1] == '\\') {
+      line.resize(line.size() - 1);
+      string line2;
 
-        } else if (sscanf(line.c_str(), " # pragma%*[ \t]include <%2047[^\"]> %n", incfile, &nread) == 1
-            && nread == line.size()) {
-          // Angled includes are also OK, but we don't search in the
-          // directory of the source file.
-          incfn = incfile;
+      if (getline(*source, line2)) {
+        line += line2;
+        out.put('\n');
+        ++lineno;
+      } else {
+        break;
+      }
+    }
 
+    // Look for comments to strip.  This is necessary because comments may
+    // appear in the middle of or around a preprocessor definition.
+    size_t line_comment = line.find("//");
+    size_t block_comment = line.find("/*");
+    if (line_comment < block_comment) {
+      // A line comment - strip off the rest of the line.
+      line.resize(line_comment);
+
+    } else if (block_comment < line_comment) {
+      // A block comment.  Search for closing block.
+      string line2 = line.substr(block_comment + 2);
+
+      // According to the GLSL specification, a block comment is replaced with
+      // a single whitespace character.
+      line.resize(block_comment);
+      line += ' ';
+
+      size_t block_end = line2.find("*/");
+      while (block_end == string::npos) {
+        // Didn't find it - look in the next line.
+        if (getline(*source, line2)) {
+          out.put('\n');
+          ++lineno;
+          block_end = line2.find("*/");
         } else {
-          // Couldn't parse it.
           shader_cat.error()
-            << "Malformed #pragma include at line " << lineno
-            << " of file " << fn << ":\n  " << line << "\n";
+            << "Expected */ before end of file " << fn << "\n";
           return false;
         }
       }
 
+      line += line2.substr(block_end + 2);
+    }
+
+    // Check if this line contains a #directive.
+    char directive[64];
+    if (line.size() < 8 || sscanf(line.c_str(), " # %63s", directive) != 1) {
+      // Nope.  Just pass the line through unmodified.
+      out << line << "\n";
+      continue;
+    }
+
+    char pragma[64];
+    int nread = 0;
+    // What kind of directive is it?
+    if (strcmp(directive, "pragma") == 0 &&
+        sscanf(line.c_str(), " # pragma %63s", pragma) == 1) {
+      if (strcmp(pragma, "include") == 0) {
+        // Allow both double quotes and angle brackets.
+        Filename incfn, source_dir;
+        {
+          char incfile[2048];
+          if (sscanf(line.c_str(), " # pragma%*[ \t]include \"%2047[^\"]\" %n", incfile, &nread) == 1
+              && nread == line.size()) {
+            // A regular include, with double quotes.  Probably a local file.
+            source_dir = full_fn.get_dirname();
+            incfn = incfile;
+
+          } else if (sscanf(line.c_str(), " # pragma%*[ \t]include <%2047[^\"]> %n", incfile, &nread) == 1
+              && nread == line.size()) {
+            // Angled includes are also OK, but we don't search in the directory
+            // of the source file.
+            incfn = incfile;
+
+          } else {
+            // Couldn't parse it.
+            shader_cat.error()
+              << "Malformed #pragma include at line " << lineno
+              << " of file " << fn << ":\n  " << line << "\n";
+            return false;
+          }
+        }
+
+        // OK, great.  Process the include.
+        if (!r_preprocess_source(out, incfn, source_dir, once_files, record, depth + 1)) {
+          // An error occurred.  Pass on the failure.
+          shader_cat.error(false) << "included at line "
+            << lineno << " of file " << fn << ":\n  " << line << "\n";
+          return false;
+        }
+
+        // Restore the line counter.
+        out << "#line " << (lineno + 1) << " " << fileno << " // " << fn << "\n";
+        had_include = true;
+
+      } else if (strcmp(pragma, "once") == 0) {
+        // Do a stricter syntax check, just to be extra safe.
+        if (sscanf(line.c_str(), " # pragma%*[ \t]once %n", &nread) != 0 ||
+            nread != line.size()) {
+          shader_cat.error()
+            << "Malformed #pragma once at line " << lineno
+            << " of file " << fn << ":\n  " << line << "\n";
+          return false;
+        }
+
+        once_files.insert(full_fn);
+
+      } else {
+        // Forward it, the driver will ignore it if it doesn't know it.
+        out << line << "\n";
+      }
+
+    } else if (strcmp(directive, "endif") == 0) {
+      // Check for an #endif after an include.  We have to restore the line
+      // number in case the include happened under an #if block.
+      out << line << "\n";
+      int nread = 0;
+      if (had_include) {
+        out << "#line " << (lineno + 1) << " " << fileno << "\n";
+      }
+
+    } else if (strcmp(directive, "extension") == 0) {
+      // Check for special preprocessing extensions.
+      char extension[256];
+      char behavior[9];
+      if (sscanf(line.c_str(), " # extension%*[ \t]%255s : %8s", extension, behavior) == 2) {
+        // Parse the behavior string.
+        int mode;
+        if (strcmp(behavior, "require") == 0 || strcmp(behavior, "enable") == 0) {
+          mode = 2;
+        } else if (strcmp(behavior, "warn") == 0) {
+          mode = 1;
+        } else if (strcmp(behavior, "disable") == 0) {
+          mode = 0;
+        } else {
+          shader_cat.error()
+            << "Extension directive specifies invalid behavior at line "
+            << lineno << " of file " << fn << ":\n  " << line << "\n";
+          return false;
+        }
+
+        if (strcmp(extension, "all") == 0) {
+          if (mode == 2) {
+            shader_cat.error()
+              << "Extension directive for 'all' may only specify 'warn' or "
+                 "'disable' at line " << lineno << " of file " << fn
+              << ":\n  " << line << "\n";
+            return false;
+          }
+          ext_google_include = mode;
+          ext_google_line = mode;
+          out << line << "\n";
+
+        } else if (strcmp(extension, "GL_GOOGLE_include_directive") == 0) {
+          // Enable the Google extension support for #include statements.
+          // This also implicitly enables GL_GOOGLE_cpp_style_line_directive.
+          // This matches the behavior of Khronos' glslang reference compiler.
+          ext_google_include = mode;
+          ext_google_line = mode;
+
+        } else if (strcmp(extension, "GL_GOOGLE_cpp_style_line_directive") == 0) {
+          // Enables strings in #line statements.
+          ext_google_line = mode;
+
+        } else {
+          // It's an extension the driver should worry about.
+          out << line << "\n";
+        }
+      } else {
+        shader_cat.error()
+          << "Failed to parse extension directive at line "
+          << lineno << " of file " << fn << ":\n  " << line << "\n";
+        return false;
+      }
+    } else if (ext_google_include > 0 && strcmp(directive, "include") == 0) {
+      // Warn about extension use if requested.
+      if (ext_google_include == 1) {
+        shader_cat.warning()
+          << "Extension GL_GOOGLE_include_directive is being used at line "
+          << lineno << " of file " << fn
+#ifndef NDEBUG
+          << ":\n  " << line
+#endif
+          << "\n";
+      }
+
+      // This syntax allows only double quotes, not angle brackets.
+      Filename incfn;
+      {
+        char incfile[2048];
+        if (sscanf(line.c_str(), " # include%*[ \t]\"%2047[^\"]\" %n", incfile, &nread) != 1
+            || nread != line.size()) {
+          // Couldn't parse it.
+          shader_cat.error()
+            << "Malformed #include at line " << lineno
+            << " of file " << fn << ":\n  " << line << "\n";
+          return false;
+        }
+        incfn = incfile;
+      }
+
       // OK, great.  Process the include.
-      if (!r_preprocess_source(out, incfn, source_dir, once_files, depth + 1)) {
+      Filename source_dir = full_fn.get_dirname();
+      if (!r_preprocess_source(out, incfn, source_dir, once_files, record, depth + 1)) {
         // An error occurred.  Pass on the failure.
         shader_cat.error(false) << "included at line "
           << lineno << " of file " << fn << ":\n  " << line << "\n";
@@ -2333,25 +2691,36 @@ r_preprocess_source(ostream &out, const Filename &fn,
       out << "#line " << (lineno + 1) << " " << fileno << " // " << fn << "\n";
       had_include = true;
 
-    } else if (strcmp(pragma, "once") == 0) {
-      // Do a stricter syntax check, just to be extra safe.
-      if (sscanf(line.c_str(), " # pragma%*[ \t]once %n", &nread) != 0 ||
-          nread != line.size()) {
-        shader_cat.error()
-          << "Malformed #pragma once at line " << lineno
-          << " of file " << fn << ":\n  " << line << "\n";
-        return false;
+    } else if (ext_google_line > 0 && strcmp(directive, "line") == 0) {
+      // It's a #line directive.  See if it uses a string instead of number.
+      char filestr[2048];
+      if (sscanf(line.c_str(), " # line%*[ \t]%d%*[ \t]\"%2047[^\"]\" %n", &lineno, filestr, &nread) == 2
+          && nread == line.size()) {
+        // Warn about extension use if requested.
+        if (ext_google_line == 1) {
+          shader_cat.warning()
+            << "Extension GL_GOOGLE_cpp_style_line_directive is being used at line "
+            << lineno << " of file " << fn
+#ifndef NDEBUG
+            << ":\n  " << line
+#endif
+            << "\n";
+        }
+
+        // Replace the string line number with an integer.  This is something
+        // we can substitute later when parsing the GLSL log from the driver.
+        fileno = 2048 + _included_files.size();
+        _included_files.push_back(Filename(filestr));
+
+        out << "#line " << lineno << " " << fileno << " // " << filestr << "\n";
+
+      } else {
+        // We couldn't parse the #line directive.  Pass it through unmodified.
+        out << line << "\n";
       }
-
-      once_files.insert(full_fn);
-
-    } else if (strcmp(pragma, "optionNV") == 0) {
-      // This is processed by NVIDIA drivers.  Don't touch it.
-
     } else {
-      shader_cat.warning()
-        << "Ignoring unknown pragma directive \"" << pragma << "\" at line "
-        << lineno << " of file " << fn << ":\n  " << line << "\n";
+      // Different directive (eg. #version).  Leave it untouched.
+      out << line << "\n";
     }
   }
 
@@ -2359,12 +2728,10 @@ r_preprocess_source(ostream &out, const Filename &fn,
   return true;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::check_modified
-//       Access: Private
-//  Description: Checks whether the shader or any of its dependent
-//               files were modified on disk.
-////////////////////////////////////////////////////////////////////
+/**
+ * Checks whether the shader or any of its dependent files were modified on
+ * disk.
+ */
 bool Shader::
 check_modified() const {
   VirtualFileSystem *vfs = VirtualFileSystem::get_global_ptr();
@@ -2383,22 +2750,20 @@ check_modified() const {
 }
 
 #ifdef HAVE_CG
-////////////////////////////////////////////////////////////////////
-//  Function: Shader::cg_get_profile_from_header
-//  Access: Private
-//  Description: Determines the appropriate active shader profile settings
-//               based on any profile directives stored within the shader header
-////////////////////////////////////////////////////////////////////
+/**
+ * Determines the appropriate active shader profile settings based on any
+ * profile directives stored within the shader header
+ */
 void Shader::
 cg_get_profile_from_header(ShaderCaps& caps) {
-  // Note this forces profile based on what is specified in the shader
-  // header string.  Should probably be relying on card caps eventually.
+  // Note this forces profile based on what is specified in the shader header
+  // string.  Should probably be relying on card caps eventually.
 
   string buf;
   parse_init();
 
-  // Assume that if parse doesn't extend after a parse line then
-  // we've reached the end of _text
+  // Assume that if parse doesn't extend after a parse line then we've reached
+  // the end of _text
   int lastParse;
 
   do {
@@ -2513,17 +2878,15 @@ cg_get_profile_from_header(ShaderCaps& caps) {
 }
 #endif
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::Destructor
-//       Access: Public
-//  Description: Delete the compiled code, if it exists.
-////////////////////////////////////////////////////////////////////
+/**
+ * Delete the compiled code, if it exists.
+ */
 Shader::
 ~Shader() {
   release_all();
-  // Note: don't try to erase ourselves from the table.  It currently
-  // keeps a reference forever, and so the only place where this
-  // constructor is called is in the destructor of the table itself.
+  // Note: don't try to erase ourselves from the table.  It currently keeps a
+  // reference forever, and so the only place where this constructor is called
+  // is in the destructor of the table itself.
   /*if (_loaded) {
     _load_table.erase(_filename);
   } else {
@@ -2531,11 +2894,30 @@ Shader::
   }*/
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::load
-//       Access: Published, Static
-//  Description: Loads the shader with the given filename.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the filename of the included shader with the given source file
+ * index (as recorded in the #line statement in r_preprocess_source).  We use
+ * this to associate error messages with included files.
+ */
+Filename Shader::
+get_filename_from_index(int index, ShaderType type) const {
+  if (index == 0) {
+    Filename fn = get_filename(type);
+    if (!fn.empty()) {
+      return fn;
+    }
+  } else if (glsl_preprocess && index >= 2048 &&
+             (index - 2048) < (int)_included_files.size()) {
+    return _included_files[(size_t)index - 2048];
+  }
+  // Must be a mistake.  Quietly put back the integer.
+  string str = format_string(index);
+  return Filename(str);
+}
+
+/**
+ * Loads the shader with the given filename.
+ */
 PT(Shader) Shader::
 load(const Filename &file, ShaderLanguage lang) {
   ShaderFile sfile(file);
@@ -2561,12 +2943,9 @@ load(const Filename &file, ShaderLanguage lang) {
   return shader;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::load
-//       Access: Published, Static
-//  Description: This variant of Shader::load loads all shader
-//               programs separately.
-////////////////////////////////////////////////////////////////////
+/**
+ * This variant of Shader::load loads all shader programs separately.
+ */
 PT(Shader) Shader::
 load(ShaderLanguage lang, const Filename &vertex,
      const Filename &fragment, const Filename &geometry,
@@ -2594,16 +2973,22 @@ load(ShaderLanguage lang, const Filename &vertex,
   return shader;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::load_compute
-//       Access: Published, Static
-//  Description: Loads a compute shader.
-////////////////////////////////////////////////////////////////////
+/**
+ * Loads a compute shader.
+ */
 PT(Shader) Shader::
 load_compute(ShaderLanguage lang, const Filename &fn) {
   if (lang != SL_GLSL) {
     shader_cat.error()
       << "Only GLSL compute shaders are currently supported.\n";
+    return NULL;
+  }
+
+  Filename fullpath(fn);
+  VirtualFileSystem *vfs = VirtualFileSystem::get_global_ptr();
+  if (!vfs->resolve_filename(fullpath, get_model_path())) {
+    shader_cat.error()
+      << "Could not find compute shader file: " << fn << "\n";
     return NULL;
   }
 
@@ -2624,20 +3009,36 @@ load_compute(ShaderLanguage lang, const Filename &fn) {
     }
   }
 
+  BamCache *cache = BamCache::get_global_ptr();
+  PT(BamCacheRecord) record = cache->lookup(fullpath, "sho");
+  if (record != (BamCacheRecord *)NULL) {
+    if (record->has_data()) {
+      shader_cat.info()
+        << "Compute shader " << fn << " was found in disk cache.\n";
+
+      return DCAST(Shader, record->get_data());
+    }
+  }
+
   PT(Shader) shader = new Shader(lang);
-  if (!shader->read(sfile)) {
+
+  if (!shader->read(sfile, record)) {
     return NULL;
   }
+
+  // It makes little sense to cache the shader before compilation, so we keep
+  // the record for when we have the compiled the shader.
+  swap(shader->_record, record);
+  shader->_cache_compiled_shader = BamCache::get_global_ptr()->get_cache_compiled_shaders();
+  shader->_fullpath = shader->_source_files[0];
 
   _load_table[sfile] = shader;
   return shader;
 }
 
-//////////////////////////////////////////////////////////////////////
-//     Function: Shader::make
-//       Access: Published, Static
-//  Description: Loads the shader, using the string as shader body.
-//////////////////////////////////////////////////////////////////////
+/**
+ * Loads the shader, using the string as shader body.
+ */
 PT(Shader) Shader::
 make(const string &body, ShaderLanguage lang) {
   if (lang == SL_GLSL) {
@@ -2701,11 +3102,9 @@ make(const string &body, ShaderLanguage lang) {
   return shader;
 }
 
-//////////////////////////////////////////////////////////////////////
-//     Function: Shader::make
-//       Access: Published, Static
-//  Description: Loads the shader, using the strings as shader bodies.
-//////////////////////////////////////////////////////////////////////
+/**
+ * Loads the shader, using the strings as shader bodies.
+ */
 PT(Shader) Shader::
 make(ShaderLanguage lang, const string &vertex, const string &fragment,
      const string &geometry, const string &tess_control,
@@ -2752,11 +3151,9 @@ make(ShaderLanguage lang, const string &vertex, const string &fragment,
   return shader;
 }
 
-//////////////////////////////////////////////////////////////////////
-//     Function: Shader::make_compute
-//       Access: Published, Static
-//  Description: Loads the compute shader from the given string.
-//////////////////////////////////////////////////////////////////////
+/**
+ * Loads the compute shader from the given string.
+ */
 PT(Shader) Shader::
 make_compute(ShaderLanguage lang, const string &body) {
   if (lang != SL_GLSL) {
@@ -2788,24 +3185,19 @@ make_compute(ShaderLanguage lang, const string &body) {
   return shader;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::parse_init
-//       Access: Public
-//  Description: Set a 'parse pointer' to the beginning of the shader.
-////////////////////////////////////////////////////////////////////
+/**
+ * Set a 'parse pointer' to the beginning of the shader.
+ */
 void Shader::
 parse_init() {
   _parse = 0;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::parse_line
-//       Access: Public
-//  Description: Parse a line of text. If 'lt' is true, trim blanks
-//               from the left end of the line. If 'rt' is true, trim
-//               blanks from the right end (the newline is always
-//               trimmed).
-////////////////////////////////////////////////////////////////////
+/**
+ * Parse a line of text.  If 'lt' is true, trim blanks from the left end of
+ * the line.  If 'rt' is true, trim blanks from the right end (the newline is
+ * always trimmed).
+ */
 void Shader::
 parse_line(string &result, bool lt, bool rt) {
   nassertv(!_text._separate);
@@ -2827,14 +3219,11 @@ parse_line(string &result, bool lt, bool rt) {
   result = _text._shared.substr(head, tail-head);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::parse_upto
-//       Access: Public
-//  Description: Parse lines until you read a line that matches the
-//               specified pattern.  Returns all the preceding lines,
-//               and if the include flag is set, returns the final
-//               line as well.
-////////////////////////////////////////////////////////////////////
+/**
+ * Parse lines until you read a line that matches the specified pattern.
+ * Returns all the preceding lines, and if the include flag is set, returns
+ * the final line as well.
+ */
 void Shader::
 parse_upto(string &result, string pattern, bool include) {
   nassertv(!_text._separate);
@@ -2854,53 +3243,41 @@ parse_upto(string &result, string pattern, bool include) {
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::parse_rest
-//       Access: Public
-//  Description: Returns the rest of the text from the current
-//               parse location.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns the rest of the text from the current parse location.
+ */
 void Shader::
 parse_rest(string &result) {
   nassertv(!_text._separate);
   result = _text._shared.substr(_parse, _text._shared.size() - _parse);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::parse_eof
-//       Access: Public
-//  Description: Returns true if the parse pointer is at the end of
-//               the shader.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if the parse pointer is at the end of the shader.
+ */
 bool Shader::
 parse_eof() {
   return (int)_text._shared.size() == _parse;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::prepare
-//       Access: Published
-//  Description: Indicates that the shader should be enqueued to be
-//               prepared in the indicated prepared_objects at the
-//               beginning of the next frame.  This will ensure the
-//               texture is already loaded into texture memory if it
-//               is expected to be rendered soon.
-//
-//               Use this function instead of prepare_now() to preload
-//               textures from a user interface standpoint.
-////////////////////////////////////////////////////////////////////
+/**
+ * Indicates that the shader should be enqueued to be prepared in the
+ * indicated prepared_objects at the beginning of the next frame.  This will
+ * ensure the texture is already loaded into texture memory if it is expected
+ * to be rendered soon.
+ *
+ * Use this function instead of prepare_now() to preload textures from a user
+ * interface standpoint.
+ */
 void Shader::
 prepare(PreparedGraphicsObjects *prepared_objects) {
   prepared_objects->enqueue_shader(this);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::is_prepared
-//       Access: Published
-//  Description: Returns true if the shader has already been prepared
-//               or enqueued for preparation on the indicated GSG,
-//               false otherwise.
-////////////////////////////////////////////////////////////////////
+/**
+ * Returns true if the shader has already been prepared or enqueued for
+ * preparation on the indicated GSG, false otherwise.
+ */
 bool Shader::
 is_prepared(PreparedGraphicsObjects *prepared_objects) const {
   Contexts::const_iterator ci;
@@ -2911,13 +3288,10 @@ is_prepared(PreparedGraphicsObjects *prepared_objects) const {
   return prepared_objects->is_shader_queued(this);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::release
-//       Access: Published
-//  Description: Frees the texture context only on the indicated object,
-//               if it exists there.  Returns true if it was released,
-//               false if it had not been prepared.
-////////////////////////////////////////////////////////////////////
+/**
+ * Frees the texture context only on the indicated object, if it exists there.
+ * Returns true if it was released, false if it had not been prepared.
+ */
 bool Shader::
 release(PreparedGraphicsObjects *prepared_objects) {
   Contexts::iterator ci;
@@ -2936,22 +3310,17 @@ release(PreparedGraphicsObjects *prepared_objects) {
   return prepared_objects->dequeue_shader(this);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::prepare_now
-//       Access: Published
-//  Description: Creates a context for the shader on the particular
-//               GSG, if it does not already exist.  Returns the new
-//               (or old) ShaderContext.  This assumes that the
-//               GraphicsStateGuardian is the currently active
-//               rendering context and that it is ready to accept new
-//               textures.  If this is not necessarily the case, you
-//               should use prepare() instead.
-//
-//               Normally, this is not called directly except by the
-//               GraphicsStateGuardian; a shader does not need to be
-//               explicitly prepared by the user before it may be
-//               rendered.
-////////////////////////////////////////////////////////////////////
+/**
+ * Creates a context for the shader on the particular GSG, if it does not
+ * already exist.  Returns the new (or old) ShaderContext.  This assumes that
+ * the GraphicsStateGuardian is the currently active rendering context and
+ * that it is ready to accept new textures.  If this is not necessarily the
+ * case, you should use prepare() instead.
+ *
+ * Normally, this is not called directly except by the GraphicsStateGuardian;
+ * a shader does not need to be explicitly prepared by the user before it may
+ * be rendered.
+ */
 ShaderContext *Shader::
 prepare_now(PreparedGraphicsObjects *prepared_objects,
             GraphicsStateGuardianBase *gsg) {
@@ -2967,15 +3336,12 @@ prepare_now(PreparedGraphicsObjects *prepared_objects,
   return tc;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::clear_prepared
-//       Access: Private
-//  Description: Removes the indicated PreparedGraphicsObjects table
-//               from the Shader's table, without actually releasing
-//               the texture.  This is intended to be called only from
-//               PreparedGraphicsObjects::release_texture(); it should
-//               never be called by user code.
-////////////////////////////////////////////////////////////////////
+/**
+ * Removes the indicated PreparedGraphicsObjects table from the Shader's
+ * table, without actually releasing the texture.  This is intended to be
+ * called only from PreparedGraphicsObjects::release_texture(); it should
+ * never be called by user code.
+ */
 void Shader::
 clear_prepared(PreparedGraphicsObjects *prepared_objects) {
   Contexts::iterator ci;
@@ -2983,25 +3349,22 @@ clear_prepared(PreparedGraphicsObjects *prepared_objects) {
   if (ci != _contexts.end()) {
     _contexts.erase(ci);
   } else {
-    // If this assertion fails, clear_prepared() was given a
-    // prepared_objects which the texture didn't know about.
+    // If this assertion fails, clear_prepared() was given a prepared_objects
+    // which the texture didn't know about.
     nassertv(false);
   }
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::release_all
-//       Access: Published
-//  Description: Frees the context allocated on all objects for which
-//               the texture has been declared.  Returns the number of
-//               contexts which have been freed.
-////////////////////////////////////////////////////////////////////
+/**
+ * Frees the context allocated on all objects for which the texture has been
+ * declared.  Returns the number of contexts which have been freed.
+ */
 int Shader::
 release_all() {
   // We have to traverse a copy of the _contexts list, because the
-  // PreparedGraphicsObjects object will call clear_prepared() in response
-  // to each release_texture(), and we don't want to be modifying the
-  // _contexts list while we're traversing it.
+  // PreparedGraphicsObjects object will call clear_prepared() in response to
+  // each release_texture(), and we don't want to be modifying the _contexts
+  // list while we're traversing it.
   Contexts temp = _contexts;
   int num_freed = (int)_contexts.size();
 
@@ -3014,18 +3377,16 @@ release_all() {
     }
   }
 
-  // There might still be some outstanding contexts in the map, if
-  // there were any NULL pointers there.  Eliminate them.
+  // There might still be some outstanding contexts in the map, if there were
+  // any NULL pointers there.  Eliminate them.
   _contexts.clear();
 
   return num_freed;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::ShaderCapabilities::clear()
-//       Access: Public
-//  Description:
-////////////////////////////////////////////////////////////////////
+/**
+ *
+ */
 void Shader::ShaderCaps::
 clear() {
   _supports_glsl = false;
@@ -3034,47 +3395,40 @@ clear() {
   _active_vprofile = CG_PROFILE_UNKNOWN;
   _active_fprofile = CG_PROFILE_UNKNOWN;
   _active_gprofile = CG_PROFILE_UNKNOWN;
-  _active_fprofile = CG_PROFILE_UNKNOWN;
   _ultimate_vprofile = CG_PROFILE_UNKNOWN;
   _ultimate_fprofile = CG_PROFILE_UNKNOWN;
   _ultimate_gprofile = CG_PROFILE_UNKNOWN;
-  _ultimate_fprofile = CG_PROFILE_UNKNOWN;
 #endif
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::register_with_read_factory
-//       Access: Public, Static
-//  Description: Tells the BamReader how to create objects of type
-//               Shader.
-////////////////////////////////////////////////////////////////////
+/**
+ * Tells the BamReader how to create objects of type Shader.
+ */
 void Shader::
 register_with_read_factory() {
-  //BamReader::get_factory()->register_factory(get_class_type(), make_from_bam);
+  BamReader::get_factory()->register_factory(get_class_type(), make_from_bam);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::write_datagram
-//       Access: Public, Virtual
-//  Description: Writes the contents of this object to the datagram
-//               for shipping out to a Bam file.
-////////////////////////////////////////////////////////////////////
+/**
+ * Writes the contents of this object to the datagram for shipping out to a
+ * Bam file.
+ */
 void Shader::
 write_datagram(BamWriter *manager, Datagram &dg) {
   dg.add_uint8(_language);
   dg.add_bool(_loaded);
   _filename.write_datagram(dg);
   _text.write_datagram(dg);
+
+  dg.add_uint32(_compiled_format);
+  dg.add_string(_compiled_binary);
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::make_from_bam
-//       Access: Protected, Static
-//  Description: This function is called by the BamReader's factory
-//               when a new object of type Shader is encountered
-//               in the Bam file.  It should create the Shader
-//               and extract its information from the file.
-////////////////////////////////////////////////////////////////////
+/**
+ * This function is called by the BamReader's factory when a new object of
+ * type Shader is encountered in the Bam file.  It should create the Shader
+ * and extract its information from the file.
+ */
 TypedWritable *Shader::
 make_from_bam(const FactoryParams &params) {
   Shader *attrib = new Shader(SL_none);
@@ -3086,17 +3440,17 @@ make_from_bam(const FactoryParams &params) {
   return attrib;
 }
 
-////////////////////////////////////////////////////////////////////
-//     Function: Shader::fillin
-//       Access: Protected
-//  Description: This internal function is called by make_from_bam to
-//               read in all of the relevant data from the BamFile for
-//               the new Shader.
-////////////////////////////////////////////////////////////////////
+/**
+ * This internal function is called by make_from_bam to read in all of the
+ * relevant data from the BamFile for the new Shader.
+ */
 void Shader::
 fillin(DatagramIterator &scan, BamReader *manager) {
   _language = (ShaderLanguage) scan.get_uint8();
   _loaded = scan.get_bool();
   _filename.read_datagram(scan);
   _text.read_datagram(scan);
+
+  _compiled_format = scan.get_uint32();
+  _compiled_binary = scan.get_string();
 }

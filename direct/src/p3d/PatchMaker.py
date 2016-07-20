@@ -1,3 +1,5 @@
+__all__ = ["PatchMaker"]
+
 from direct.p3d.FileSpec import FileSpec
 from direct.p3d.SeqValue import SeqValue
 from panda3d.core import *
@@ -135,7 +137,7 @@ class PatchMaker:
 
             startFile, startPv, plan = self.getRecreateFilePlan()
 
-            if startFile.getExtension() == 'pz':
+            if startFile.getExtension() in ('pz', 'gz'):
                 # If the starting file is compressed, we have to
                 # decompress it first.
                 assert startPv.tempFile is None
@@ -178,7 +180,7 @@ class PatchMaker:
             result = Filename.temporary('', 'patch_')
             p = Patchfile()
             if not p.apply(patchFilename, origFile, result):
-                print "Internal patching failed: %s" % (patchFilename)
+                print("Internal patching failed: %s" % (patchFilename))
                 return None
 
             return result
@@ -343,7 +345,7 @@ class PatchMaker:
             packageDescFullpath = Filename(self.patchMaker.installDir, self.packageDesc)
             self.doc = TiXmlDocument(packageDescFullpath.toOsSpecific())
             if not self.doc.LoadFile():
-                print "Couldn't read %s" % (packageDescFullpath)
+                print("Couldn't read %s" % (packageDescFullpath))
                 return False
 
             xpackage = self.doc.FirstChildElement('package')
@@ -535,7 +537,7 @@ class PatchMaker:
                     packageSeq.storeXml(xpackage, 'seq')
                     doc.SaveFile()
             else:
-                print "Couldn't read %s" % (importDescFullpath)
+                print("Couldn't read %s" % (importDescFullpath))
 
             if self.contentsDocPackage:
                 # Now that we've rewritten the xml file, we have to
@@ -631,7 +633,7 @@ class PatchMaker:
         doc = TiXmlDocument(contentsFilename.toOsSpecific())
         if not doc.LoadFile():
             # Couldn't read file.
-            print "couldn't read %s" % (contentsFilename)
+            print("couldn't read %s" % (contentsFilename))
             return False
 
         xcontents = doc.FirstChildElement('contents')
@@ -738,7 +740,7 @@ class PatchMaker:
                 remainingNames.remove(package.packageName)
 
         if remainingNames:
-            print "Unknown packages: %s" % (remainingNames,)
+            print("Unknown packages: %s" % (remainingNames,))
 
     def processAllPackages(self):
         """ Walks through the list of packages, and builds missing
@@ -763,7 +765,7 @@ class PatchMaker:
             filename = Filename(package.currentFile.filename + '.%s.patch' % (package.patchVersion))
             assert filename not in self.patchFilenames
             if not self.buildPatch(topPv, currentPv, package, filename):
-                raise StandardError, "Couldn't build patch."
+                raise Exception("Couldn't build patch.")
 
     def buildPatch(self, v1, v2, package, patchFilename):
         """ Builds a patch from PackageVersion v1 to PackageVersion
@@ -778,7 +780,7 @@ class PatchMaker:
         compressedPathname = Filename(pathname + '.pz')
         compressedPathname.unlink()
         if not compressFile(pathname, compressedPathname, 9):
-            raise StandardError, "Couldn't compress patch."
+            raise Exception("Couldn't compress patch.")
         pathname.unlink()
 
         patchfile = self.Patchfile(package)
@@ -801,7 +803,7 @@ class PatchMaker:
             # No original version to patch from.
             return False
 
-        print "Building patch from %s to %s" % (printOrigName, printNewName)
+        print("Building patch from %s to %s" % (printOrigName, printNewName))
         patchFilename.unlink()
         p = Patchfile()  # The C++ class
         if p.build(origFilename, newFilename, patchFilename):

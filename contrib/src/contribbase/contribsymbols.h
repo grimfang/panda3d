@@ -1,8 +1,4 @@
-/* Filename: contribsymbols.h
- * Created by:  rdb (30Dec09)
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- *
+/**
  * PANDA 3D SOFTWARE
  * Copyright (c) Carnegie Mellon University.  All rights reserved.
  *
@@ -10,7 +6,10 @@
  * license.  You should have received a copy of this license along
  * with this source code in a file named "LICENSE."
  *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+ * @file contribsymbols.h
+ * @author rdb
+ * @date 2009-12-30
+ */
 
 #ifndef CONTRIBSYMBOLS_H
 #define CONTRIBSYMBOLS_H
@@ -22,21 +21,12 @@
    C++-style comments, since this file is occasionally included by a C
    file. */
 
-#if defined(WIN32_VC) && !defined(CPPPARSER) && !defined(LINK_ALL_STATIC)
-
 #ifdef BUILDING_PANDAAI
-  #define EXPCL_PANDAAI __declspec(dllexport)
-  #define EXPTP_PANDAAI
+  #define EXPCL_PANDAAI EXPORT_CLASS
+  #define EXPTP_PANDAAI EXPORT_TEMPL
 #else
-  #define EXPCL_PANDAAI __declspec(dllimport)
-  #define EXPTP_PANDAAI extern
+  #define EXPCL_PANDAAI IMPORT_CLASS
+  #define EXPTP_PANDAAI IMPORT_TEMPL
 #endif
-
-#else   /* !WIN32_VC */
-
-#define EXPCL_PANDAAI
-#define EXPTP_PANDAAI
-
-#endif  /* WIN32_VC */
 
 #endif

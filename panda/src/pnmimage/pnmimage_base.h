@@ -1,32 +1,31 @@
-// Filename: pnmimage_base.h
-// Created by:  drose (14Jun00)
-//
-////////////////////////////////////////////////////////////////////
-//
-// PANDA 3D SOFTWARE
-// Copyright (c) Carnegie Mellon University.  All rights reserved.
-//
-// All use of this software is subject to the terms of the revised BSD
-// license.  You should have received a copy of this license along
-// with this source code in a file named "LICENSE."
-//
-////////////////////////////////////////////////////////////////////
+/**
+ * PANDA 3D SOFTWARE
+ * Copyright (c) Carnegie Mellon University.  All rights reserved.
+ *
+ * All use of this software is subject to the terms of the revised BSD
+ * license.  You should have received a copy of this license along
+ * with this source code in a file named "LICENSE."
+ *
+ * @file pnmimage_base.h
+ * @author drose
+ * @date 2000-06-14
+ */
 
 #ifndef PNMIMAGE_BASE_H
 #define PNMIMAGE_BASE_H
 
-// This header file make a few typedefs and other definitions
-// essential to everything in the PNMImage package.
+// This header file make a few typedefs and other definitions essential to
+// everything in the PNMImage package.
 
 #include "pandabase.h"
 #include "pnotify.h"
 
-// Since we no longer include pnm.h directly, we have to provide our
-// own definitions for xel and xelval.
+// Since we no longer include pnm.h directly, we have to provide our own
+// definitions for xel and xelval.
 
-// For now, we have PGM_BIGGRAYS defined, which gives us 16-bit
-// channels.  Undefine this if you have memory problems and need to
-// use 8-bit channels instead.
+// For now, we have PGM_BIGGRAYS defined, which gives us 16-bit channels.
+// Undefine this if you have memory problems and need to use 8-bit channels
+// instead.
 #define PGM_BIGGRAYS
 
 #ifdef PGM_BIGGRAYS
@@ -42,8 +41,9 @@ typedef unsigned char gray;
 struct pixel {
 PUBLISHED:
   pixel() { }
+  pixel(gray fill) : r(fill), g(fill), b(fill) { }
   pixel(gray r, gray g, gray b) : r(r), g(g), b(b) { }
-  static int size() { return 3; }
+
   gray operator [](int i) const { nassertr(i >= 0 && i < 3, 0); return *(&r + i); }
   gray &operator [](int i) { nassertr(i >= 0 && i < 3, r); return *(&r + i); }
   pixel operator + (const pixel &other) const
@@ -60,6 +60,7 @@ PUBLISHED:
     { r *= mult; g *= mult; b *= mult; }
 
 #ifdef HAVE_PYTHON
+  static int size() { return 3; }
   void output(ostream &out) {
     out << "pixel(r=" << r << ", g=" << g << ", b=" << b << ")";
   }
@@ -93,8 +94,8 @@ typedef gray xelval;
         ( (int) PPM_GETB(p) * (newmaxval) + (oldmaxval) / 2 ) / (oldmaxval) )
 
 
-// pnm defines these functions, and it's easier to emulate them than
-// to rewrite the code that calls them.
+// pnm defines these functions, and it's easier to emulate them than to
+// rewrite the code that calls them.
 EXPCL_PANDA_PNMIMAGE void pm_message(const char *format, ...);
 EXPCL_PANDA_PNMIMAGE void pm_error(const char *format, ...);  // doesn't return.
 
