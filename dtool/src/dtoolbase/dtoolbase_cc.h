@@ -178,12 +178,6 @@ template<class T> typename remove_reference<T>::type &&move(T &&t) {
 #  endif
 #elif defined(__GNUC__) && (__cplusplus >= 201103L) // GCC
 
-// GCC defines several macros which we can query.  List of all supported
-// builtin macros: https://gcc.gnu.org/projects/cxx-status.html
-#  if __cpp_constexpr >= 200704
-#    define CONSTEXPR constexpr
-#  endif
-
 // Starting at GCC 4.4
 #  if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
 #  define DEFAULT_CTOR = default
@@ -194,6 +188,7 @@ template<class T> typename remove_reference<T>::type &&move(T &&t) {
 
 // Starting at GCC 4.6
 #  if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+#    define CONSTEXPR constexpr
 #    define NOEXCEPT noexcept
 #    define USE_MOVE_SEMANTICS
 #    define FINAL final
@@ -203,6 +198,12 @@ template<class T> typename remove_reference<T>::type &&move(T &&t) {
 // Starting at GCC 4.7
 #  if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7)
 #    define OVERRIDE override
+#  endif
+
+// GCC defines several macros which we can query.  List of all supported
+// builtin macros: https://gcc.gnu.org/projects/cxx-status.html
+#  if !defined(CONSTEXPR) && __cpp_constexpr >= 200704
+#    define CONSTEXPR constexpr
 #  endif
 
 #elif defined(_MSC_VER) && _MSC_VER >= 1900 // Visual Studio 2015
@@ -290,10 +291,10 @@ EXPCL_DTOOL void init_memory_hook();
 
 // Now redefine some handy macros to hook into the above MemoryHook object.
 #ifndef USE_MEMORY_NOWRAPPERS
-#define PANDA_MALLOC_SINGLE(size) (memory_hook->heap_alloc_single(size))
+#define PANDA_MALLOC_SINGLE(size) (ASSUME_ALIGNED(memory_hook->heap_alloc_single(size), MEMORY_HOOK_ALIGNMENT))
 #define PANDA_FREE_SINGLE(ptr) memory_hook->heap_free_single(ptr)
-#define PANDA_MALLOC_ARRAY(size) (memory_hook->heap_alloc_array(size))
-#define PANDA_REALLOC_ARRAY(ptr, size) (memory_hook->heap_realloc_array(ptr, size))
+#define PANDA_MALLOC_ARRAY(size) (ASSUME_ALIGNED(memory_hook->heap_alloc_array(size), MEMORY_HOOK_ALIGNMENT))
+#define PANDA_REALLOC_ARRAY(ptr, size) (ASSUME_ALIGNED(memory_hook->heap_realloc_array(ptr, size), MEMORY_HOOK_ALIGNMENT))
 #define PANDA_FREE_ARRAY(ptr) memory_hook->heap_free_array(ptr)
 #else
 #define PANDA_MALLOC_SINGLE(size) ::malloc(size)
